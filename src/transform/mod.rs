@@ -1,0 +1,30 @@
+use serde_json::{json, Value};
+
+use crate::{Error, ReceivedMessage};
+
+pub fn identity(_: &ReceivedMessage, value: Value) -> Result<Value, Error> {
+    Ok(value)
+}
+
+pub fn insert_attribute(
+    key: &str,
+    received_message: &ReceivedMessage,
+    value: Value,
+) -> Result<Value, Error> {
+    match received_message.message.attributes.get(key) {
+        Some(v) => match value {
+            Value::Object(mut map) => {
+                map.insert(key.to_string(), json!(v));
+                Ok(Value::Object(map))
+            }
+            other => Err(Error::Transform(format!(
+                "Unexpected JSON value `{}`",
+                other
+            ))),
+        },
+        None => Err(Error::Transform(format!(
+            "Missing attribute with key {}",
+            key
+        ))),
+    }
+}
