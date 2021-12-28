@@ -1,6 +1,6 @@
-# Labeled Variants #
+# Pub-Sub-Client #
 
-Client library for Google Cloud Pub/Sub.
+Rust library to access Google Cloud Pub/Sub.
 
 ## Contribution policy ##
 
