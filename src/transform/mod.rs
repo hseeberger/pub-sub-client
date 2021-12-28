@@ -16,11 +16,12 @@ pub fn insert_attribute(
                 map.insert(key.to_string(), json!(v));
                 Ok(Value::Object(map))
             }
-            other => Err(Error::Transform(format!(
-                "Unexpected JSON value `{}`",
-                other
-            ))),
+            other => Err(Error::Transform {
+                reason: format!("Unexpected JSON value `{}`", other),
+            }),
         },
-        None => Err(Error::Transform(format!("Missing attribute `{}`", key))),
+        None => Err(Error::Transform {
+            reason: format!("Missing attribute `{}`", key),
+        }),
     }
 }

@@ -1,5 +1,5 @@
-use std::env;
 use std::time::Duration;
+use std::{env, vec};
 
 use pub_sub_client::PubSubClient;
 use reqwest::{Client, StatusCode};
@@ -65,6 +65,12 @@ async fn test() {
                 "attributes": {
                   "type": "Bar"
                 }
+              },
+              {
+                "data": data,
+                "attributes": {
+                  "type": "Bar"
+                }
               }
             ]
           }
@@ -85,27 +91,54 @@ async fn test() {
     assert!(pub_sub_client.is_ok());
     let pub_sub_client = pub_sub_client.unwrap();
 
-    // Pull and verify
-    let pull_response = pub_sub_client
+    // Pull
+    let response = pub_sub_client
         .pull_insert_attribute::<Message>(TEST_SUBSCRIPTION, 42, "type")
         .await;
-    assert!(pull_response.is_ok());
-    let pull_response = pull_response.unwrap();
-    assert_eq!(pull_response.len(), 2);
+    assert!(response.is_ok());
+    let response = response.unwrap();
+    assert_eq!(response.len(), 3);
 
-    assert!(pull_response[0].is_ok());
+    assert!(response[0].is_ok());
+    let ack_id_1 = &response[0].as_ref().unwrap().ack_id[..];
     assert_eq!(
-        pull_response[0].as_ref().unwrap().message,
+        response[0].as_ref().unwrap().message,
         Message::Foo {
             text: "test".to_string()
         }
     );
 
-    assert!(pull_response[1].is_ok());
+    assert!(response[1].is_ok());
+    let ack_id_2 = &response[1].as_ref().unwrap().ack_id[..];
     assert_eq!(
-        pull_response[1].as_ref().unwrap().message,
+        response[1].as_ref().unwrap().message,
         Message::Bar {
             text: "test".to_string()
         }
     );
+
+    assert!(response[2].is_ok());
+    let message_id_3 = &response[2].as_ref().unwrap().id[..];
+    assert_eq!(
+        response[2].as_ref().unwrap().message,
+        Message::Bar {
+            text: "test".to_string()
+        }
+    );
+
+    // Acknowledge
+    let ack_ids = vec![ack_id_1, ack_id_2];
+    let response = pub_sub_client.acknowledge(TEST_SUBSCRIPTION, ack_ids).await;
+    assert!(response.is_ok());
+
+    // Pull again and make sure result is empty
+    let response = pub_sub_client
+        .pull_insert_attribute::<Message>(TEST_SUBSCRIPTION, 42, "type")
+        .await;
+    assert!(response.is_ok());
+    let response = response.unwrap();
+    assert_eq!(response.len(), 1);
+
+    assert!(response[0].is_ok());
+    assert_eq!(response[0].as_ref().unwrap().id, message_id_3);
 }

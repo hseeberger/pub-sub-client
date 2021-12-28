@@ -4,6 +4,7 @@ use goauth::auth::JwtClaims;
 use goauth::credentials::Credentials;
 use goauth::fetcher::TokenFetcher;
 use goauth::scopes::Scope;
+use reqwest::Response;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -31,24 +32,44 @@ impl std::fmt::Debug for PubSubClient {
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
-    #[error("Missing or invalid service account key")]
-    InvalidServiceAccountKey { source: goauth::GoErr },
-    #[error("Invalid private key (as part of service account key)")]
-    InvalidPrivateKey { source: goauth::GoErr },
-    #[error("Failed to fetch token")]
+    #[error("Initialization error: {reason}")]
+    Initialization {
+        reason: String,
+        source: goauth::GoErr,
+    },
+
+    #[error("Getting authentication token failed")]
     TokenFetch { source: goauth::GoErr },
-    #[error("Failed to pull")]
-    Pull { source: reqwest::Error },
-    #[error("Unexpected HTTP status code `{0}`")]
-    UnexpectedPullStatusCode(reqwest::StatusCode),
-    #[error("Failed to parse HTTP response from Pub/Sub")]
-    Parse { source: reqwest::Error },
-    #[error("Failed to decode message as Base64")]
-    Decode { source: base64::DecodeError },
-    #[error("Failed to deserialize message")]
+
+    #[error("HTTP communication with Pub/Sub service failed")]
+    HttpServiceCommunication { source: reqwest::Error },
+    #[error("Unexpected HTTP status code `{0}` from Pub/Sub service: {1}")]
+    UnexpectedHttpStatusCode(reqwest::StatusCode, String),
+    #[error("Unexpected HTTP response from Pub/Sub service")]
+    UnexpectedHttpResponse { source: reqwest::Error },
+
+    #[error("Decoding data of received message as Base64 failed")]
+    NoBase64 { source: base64::DecodeError },
+    #[error("Deserializing data of received message failed")]
     Deserialize { source: serde_json::Error },
-    #[error("Failed to transform JSON value: {0}")]
-    Transform(String),
+    #[error("Failed to transform JSON value: {reason}")]
+    Transform { reason: String },
+}
+
+impl Error {
+    async fn unexpected_http_status_code_from_response(response: Response) -> Error {
+        Error::UnexpectedHttpStatusCode(
+            response.status(),
+            response
+                .text()
+                .await
+                .map(|e| {
+                    serde_json::from_str::<Value>(&e).unwrap_or(Value::Null)["error"]["message"]
+                        .to_string()
+                })
+                .unwrap_or("Failed to get text for HTTP body".to_string()),
+        )
+    }
 }
 
 #[derive(Debug)]
@@ -92,10 +113,22 @@ struct PullResponse {
     received_messages: Vec<ReceivedMessage>,
 }
 
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct AcknowledgeRequest<'a> {
+    ack_ids: Vec<&'a str>,
+}
+
 impl PubSubClient {
     pub fn new(key_path: &str, refresh_buffer: Duration) -> Result<Self, Error> {
-        let credentials = Credentials::from_file(key_path)
-            .map_err(|source| Error::InvalidServiceAccountKey { source })?;
+        let credentials =
+            Credentials::from_file(key_path).map_err(|source| Error::Initialization {
+                reason: format!(
+                    "Missing or malformed service account key file at `{}`",
+                    key_path
+                ),
+                source,
+            })?;
 
         let jwt = Jwt::new(
             JwtClaims::new(
@@ -107,7 +140,13 @@ impl PubSubClient {
             ),
             credentials
                 .rsa_key()
-                .map_err(|source| Error::InvalidPrivateKey { source })?,
+                .map_err(|source| Error::Initialization {
+                    reason: format!(
+                        "Malformed private key as part of service account key file at `{}`",
+                        key_path
+                    ),
+                    source,
+                })?,
             None,
         );
 
@@ -126,77 +165,98 @@ impl PubSubClient {
 
     pub async fn pull<M: DeserializeOwned>(
         &self,
-        subscription_id: &str,
+        subscription: &str,
         max_messages: u32,
     ) -> Result<Vec<Result<MessageEnvelope<M>, Error>>, Error> {
-        self.pull_with_transform(subscription_id, max_messages, transform::identity)
+        self.pull_with_transform(subscription, max_messages, transform::identity)
             .await
     }
 
     pub async fn pull_insert_attribute<M: DeserializeOwned>(
         &self,
-        subscription_id: &str,
+        subscription: &str,
         max_messages: u32,
         key: &str,
     ) -> Result<Vec<Result<MessageEnvelope<M>, Error>>, Error> {
-        self.pull_with_transform(subscription_id, max_messages, |received_message, value| {
+        self.pull_with_transform(subscription, max_messages, |received_message, value| {
             transform::insert_attribute(key, received_message, value)
         })
         .await
     }
 
-    pub async fn pull_with_transform<M, F>(
+    pub async fn pull_with_transform<M, T>(
         &self,
         subscription: &str,
         max_messages: u32,
-        transform: F,
+        transform: T,
     ) -> Result<Vec<Result<MessageEnvelope<M>, Error>>, Error>
     where
         M: DeserializeOwned,
-        F: Fn(&ReceivedMessage, Value) -> Result<Value, Error>,
+        T: Fn(&ReceivedMessage, Value) -> Result<Value, Error>,
     {
         let url = format!("{}/v1/{}:pull", self.base_url, subscription);
-        let token = self
-            .token_fetcher
-            .fetch_token()
-            .await
-            .map_err(|source| Error::TokenFetch { source })?;
-        let pull_request = PullRequest { max_messages };
-        let response = self
-            .reqwest_client
-            .post(&url)
-            .bearer_auth(token.access_token())
-            .json(&pull_request)
-            .send()
-            .await
-            .map_err(|source| Error::Pull { source })?;
+        let request = PullRequest { max_messages };
+        let response = self.send_request(&url, &request).await?;
+
         if !response.status().is_success() {
-            return Err(Error::UnexpectedPullStatusCode(response.status()));
+            return Err(Error::unexpected_http_status_code_from_response(response).await);
         }
 
         let pull_response = response
             .json::<PullResponse>()
             .await
-            .map_err(|source| Error::Parse { source })?;
+            .map_err(|source| Error::UnexpectedHttpResponse { source })?;
 
-        Ok(messages(pull_response, transform))
+        let messages = messages_from_pull_response(pull_response, transform);
+        Ok(messages)
+    }
+
+    /// According to how Google Cloud Pub/Sub works, passing at least one invalid ACK ID fails the
+    /// whole request via a 400 Bad Request response.
+    pub async fn acknowledge(&self, subscription: &str, ack_ids: Vec<&str>) -> Result<(), Error> {
+        let url = format!("{}/v1/{}:acknowledge", self.base_url, subscription);
+        let request = AcknowledgeRequest { ack_ids };
+        let response = self.send_request(&url, &request).await?;
+
+        if !response.status().is_success() {
+            return Err(Error::unexpected_http_status_code_from_response(response).await);
+        }
+
+        Ok(())
+    }
+
+    async fn send_request<R: Serialize>(&self, url: &str, request: &R) -> Result<Response, Error> {
+        let token = self
+            .token_fetcher
+            .fetch_token()
+            .await
+            .map_err(|source| Error::TokenFetch { source })?;
+        let response = self
+            .reqwest_client
+            .post(url)
+            .bearer_auth(token.access_token())
+            .json(request)
+            .send()
+            .await
+            .map_err(|source| Error::HttpServiceCommunication { source })?;
+        Ok(response)
     }
 }
 
-fn messages<M, F>(
-    pull_response: PullResponse,
-    transform: F,
+fn messages_from_pull_response<M, T>(
+    response: PullResponse,
+    transform: T,
 ) -> Vec<Result<MessageEnvelope<M>, Error>>
 where
     M: DeserializeOwned,
-    F: Fn(&ReceivedMessage, Value) -> Result<Value, Error>,
+    T: Fn(&ReceivedMessage, Value) -> Result<Value, Error>,
 {
-    pull_response
+    response
         .received_messages
         .into_iter()
         .map(|received_message| {
             base64::decode(&received_message.message.data)
-                .map_err(|source| Error::Decode { source })
+                .map_err(|source| Error::NoBase64 { source })
                 .and_then(|decoded_data| {
                     serde_json::from_slice::<Value>(&decoded_data)
                         .map_err(|source| Error::Deserialize { source })
@@ -220,8 +280,8 @@ where
 #[cfg(test)]
 mod tests {
     use crate::{
-        messages, transform, Error, MessageEnvelope, PubSubClient, PubSubMessage, PullResponse,
-        ReceivedMessage,
+        messages_from_pull_response, transform, Error, MessageEnvelope, PubSubClient,
+        PubSubMessage, PullResponse, ReceivedMessage,
     };
     use serde::Deserialize;
     use serde_json::json;
@@ -246,7 +306,10 @@ mod tests {
         let result = PubSubClient::new("non_existent", Duration::from_secs(30));
         assert!(result.is_err());
         match result.unwrap_err() {
-            Error::InvalidServiceAccountKey { source: _ } => (),
+            Error::Initialization {
+                reason: _,
+                source: _,
+            } => (),
             other => panic!(
                 "Expected Error::InvalidServiceAccountKey, but was {}",
                 other
@@ -259,7 +322,10 @@ mod tests {
         let result = PubSubClient::new("Cargo.toml", Duration::from_secs(30));
         assert!(result.is_err());
         match result.unwrap_err() {
-            Error::InvalidServiceAccountKey { source: _ } => (),
+            Error::Initialization {
+                reason: _,
+                source: _,
+            } => (),
             other => panic!(
                 "Expected Error::InvalidServiceAccountKey, but was {}",
                 other
@@ -272,7 +338,10 @@ mod tests {
         let result = PubSubClient::new("tests/invalid_key.json", Duration::from_secs(30));
         assert!(result.is_err());
         match result.unwrap_err() {
-            Error::InvalidPrivateKey { source: _ } => (),
+            Error::Initialization {
+                reason: _,
+                source: _,
+            } => (),
             other => panic!("Expected Error::InvalidPrivateKey, but was {}", other),
         }
     }
@@ -290,7 +359,7 @@ mod tests {
         }];
         let pull_response = PullResponse { received_messages };
         let mut messages_result: Vec<Result<MessageEnvelope<Message>, Error>> =
-            messages(pull_response, |received_message, value| {
+            messages_from_pull_response(pull_response, |received_message, value| {
                 transform::insert_attribute("type", received_message, value)
             });
         assert_eq!(messages_result.len(), 1);
@@ -323,7 +392,7 @@ mod tests {
         }];
         let pull_response = PullResponse { received_messages };
         let mut messages_result: Vec<Result<MessageEnvelope<Message>, Error>> =
-            messages(pull_response, |received_message, value| {
+            messages_from_pull_response(pull_response, |received_message, value| {
                 transform::insert_attribute("type", received_message, value)
             });
         assert_eq!(messages_result.len(), 1);
