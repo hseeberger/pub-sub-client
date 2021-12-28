@@ -22,4 +22,6 @@ thiserror = "1.0"
 time = "0.2"
 
 [dev-dependencies]
+# TODO switch to the standard release once Pub/Sub has been included; until then use "dev"
+testcontainers = { git = "https://github.com/testcontainers/testcontainers-rs", branch = "dev" }
 tokio = { version = "1", features = [ "full" ] }

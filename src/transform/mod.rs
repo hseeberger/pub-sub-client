@@ -1,6 +1,5 @@
-use serde_json::{json, Value};
-
 use crate::{Error, ReceivedMessage};
+use serde_json::{json, Value};
 
 pub fn identity(_: &ReceivedMessage, value: Value) -> Result<Value, Error> {
     Ok(value)
@@ -22,9 +21,6 @@ pub fn insert_attribute(
                 other
             ))),
         },
-        None => Err(Error::Transform(format!(
-            "Missing attribute with key {}",
-            key
-        ))),
+        None => Err(Error::Transform(format!("Missing attribute `{}`", key))),
     }
 }
