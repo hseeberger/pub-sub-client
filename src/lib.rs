@@ -15,9 +15,10 @@ const BASE_URL_ENV_VAR: &str = "PUB_SUB_BASE_URL";
 const DEFAULT_BASE_URL: &str = "https://pubsub.googleapis.com";
 
 pub struct PubSubClient {
+    base_url: String,
+    project_id: String,
     token_fetcher: TokenFetcher,
     reqwest_client: reqwest::Client,
-    base_url: String,
 }
 
 impl std::fmt::Debug for PubSubClient {
@@ -155,28 +156,29 @@ impl PubSubClient {
         );
 
         Ok(Self {
+            base_url: env::var(BASE_URL_ENV_VAR).unwrap_or_else(|_| DEFAULT_BASE_URL.to_string()),
+            project_id: credentials.project(),
             token_fetcher: TokenFetcher::new(jwt, credentials, refresh_buffer),
             reqwest_client: reqwest::Client::new(),
-            base_url: env::var(BASE_URL_ENV_VAR).unwrap_or_else(|_| DEFAULT_BASE_URL.to_string()),
         })
     }
 
     pub async fn pull<M: DeserializeOwned>(
         &self,
-        subscription: &str,
+        subscription_id: &str,
         max_messages: u32,
     ) -> Result<Vec<Result<MessageEnvelope<M>, Error>>, Error> {
-        self.pull_with_transform(subscription, max_messages, |_, value| Ok(value))
+        self.pull_with_transform(subscription_id, max_messages, |_, value| Ok(value))
             .await
     }
 
     pub async fn pull_insert_attribute<M: DeserializeOwned>(
         &self,
-        subscription: &str,
+        subscription_id: &str,
         max_messages: u32,
         key: &str,
     ) -> Result<Vec<Result<MessageEnvelope<M>, Error>>, Error> {
-        self.pull_with_transform(subscription, max_messages, |received_message, value| {
+        self.pull_with_transform(subscription_id, max_messages, |received_message, value| {
             insert_attribute(key, received_message, value)
         })
         .await
@@ -184,7 +186,7 @@ impl PubSubClient {
 
     pub async fn pull_with_transform<M, T>(
         &self,
-        subscription: &str,
+        subscription_id: &str,
         max_messages: u32,
         transform: T,
     ) -> Result<Vec<Result<MessageEnvelope<M>, Error>>, Error>
@@ -192,7 +194,10 @@ impl PubSubClient {
         M: DeserializeOwned,
         T: Fn(&ReceivedMessage, Value) -> Result<Value, Error>,
     {
-        let url = format!("{}/v1/{}:pull", self.base_url, subscription);
+        let url = format!(
+            "{}/v1/projects/{}/subscriptions/{}:pull",
+            self.base_url, self.project_id, subscription_id
+        );
         let request = PullRequest { max_messages };
         let response = self.send_request(&url, &request).await?;
 
@@ -211,8 +216,15 @@ impl PubSubClient {
 
     /// According to how Google Cloud Pub/Sub works, passing at least one invalid ACK ID fails the
     /// whole request via a 400 Bad Request response.
-    pub async fn acknowledge(&self, subscription: &str, ack_ids: Vec<&str>) -> Result<(), Error> {
-        let url = format!("{}/v1/{}:acknowledge", self.base_url, subscription);
+    pub async fn acknowledge(
+        &self,
+        subscription_id: &str,
+        ack_ids: Vec<&str>,
+    ) -> Result<(), Error> {
+        let url = format!(
+            "{}/v1/projects/{}/subscriptions/{}:acknowledge",
+            self.base_url, self.project_id, subscription_id
+        );
         let request = AcknowledgeRequest { ack_ids };
         let response = self.send_request(&url, &request).await?;
 
