@@ -1,5 +1,3 @@
-pub mod transform;
-
 use goauth::auth::JwtClaims;
 use goauth::credentials::Credentials;
 use goauth::fetcher::TokenFetcher;
@@ -7,7 +5,7 @@ use goauth::scopes::Scope;
 use reqwest::Response;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
+use serde_json::{json, Value};
 use smpl_jwt::Jwt;
 use std::collections::HashMap;
 use std::env;
@@ -168,7 +166,7 @@ impl PubSubClient {
         subscription: &str,
         max_messages: u32,
     ) -> Result<Vec<Result<MessageEnvelope<M>, Error>>, Error> {
-        self.pull_with_transform(subscription, max_messages, transform::identity)
+        self.pull_with_transform(subscription, max_messages, |_, value| Ok(value))
             .await
     }
 
@@ -179,7 +177,7 @@ impl PubSubClient {
         key: &str,
     ) -> Result<Vec<Result<MessageEnvelope<M>, Error>>, Error> {
         self.pull_with_transform(subscription, max_messages, |received_message, value| {
-            transform::insert_attribute(key, received_message, value)
+            insert_attribute(key, received_message, value)
         })
         .await
     }
@@ -277,10 +275,31 @@ where
         .collect()
 }
 
+pub fn insert_attribute(
+    key: &str,
+    received_message: &ReceivedMessage,
+    value: Value,
+) -> Result<Value, Error> {
+    match received_message.message.attributes.get(key) {
+        Some(v) => match value {
+            Value::Object(mut map) => {
+                map.insert(key.to_string(), json!(v));
+                Ok(Value::Object(map))
+            }
+            other => Err(Error::Transform {
+                reason: format!("Unexpected JSON value `{}`", other),
+            }),
+        },
+        None => Err(Error::Transform {
+            reason: format!("Missing attribute `{}`", key),
+        }),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use crate::{
-        messages_from_pull_response, transform, Error, MessageEnvelope, PubSubClient,
+        insert_attribute, messages_from_pull_response, Error, MessageEnvelope, PubSubClient,
         PubSubMessage, PullResponse, ReceivedMessage,
     };
     use serde::Deserialize;
@@ -347,11 +366,11 @@ mod tests {
     }
 
     #[test]
-    fn messages_ok() {
+    fn messages_from_pull_response_ok() {
         let received_messages = vec![ReceivedMessage {
-            ack_id: "ack_id_1".to_string(),
+            ack_id: "ack_id".to_string(),
             message: PubSubMessage {
-                id: "id_1".to_string(),
+                id: "id".to_string(),
                 data: base64::encode(json!({"text": "test"}).to_string()),
                 attributes: HashMap::from([("type".to_string(), "Foo".to_string())]),
             },
@@ -360,13 +379,13 @@ mod tests {
         let pull_response = PullResponse { received_messages };
         let mut messages_result: Vec<Result<MessageEnvelope<Message>, Error>> =
             messages_from_pull_response(pull_response, |received_message, value| {
-                transform::insert_attribute("type", received_message, value)
+                insert_attribute("type", received_message, value)
             });
         assert_eq!(messages_result.len(), 1);
         assert!(messages_result[0].is_ok());
         let envelope = messages_result.pop().unwrap().unwrap();
-        assert_eq!(envelope.id, "id_1".to_string());
-        assert_eq!(envelope.ack_id, "ack_id_1".to_string());
+        assert_eq!(envelope.id, "id".to_string());
+        assert_eq!(envelope.ack_id, "ack_id".to_string());
         assert_eq!(
             envelope.attributes,
             HashMap::from([("type".to_string(), "Foo".to_string())])
@@ -380,20 +399,20 @@ mod tests {
     }
 
     #[test]
-    fn messages_error() {
+    fn messages_from_pull_response_error() {
         let received_messages = vec![ReceivedMessage {
-            ack_id: "ack_id_2".to_string(),
+            ack_id: "ack_id".to_string(),
             message: PubSubMessage {
-                id: "id_2".to_string(),
+                id: "id".to_string(),
                 data: base64::encode(json!({"text": "test"}).to_string()),
                 attributes: HashMap::new(),
             },
-            delivery_attempt: 2,
+            delivery_attempt: 1,
         }];
         let pull_response = PullResponse { received_messages };
         let mut messages_result: Vec<Result<MessageEnvelope<Message>, Error>> =
             messages_from_pull_response(pull_response, |received_message, value| {
-                transform::insert_attribute("type", received_message, value)
+                insert_attribute("type", received_message, value)
             });
         assert_eq!(messages_result.len(), 1);
         assert!(messages_result[0].is_err());
@@ -401,6 +420,66 @@ mod tests {
         assert_eq!(
             format!("{}", error),
             "Failed to transform JSON value: Missing attribute `type`"
+        );
+    }
+
+    #[test]
+    fn insert_attribute_ok() {
+        let received_message = ReceivedMessage {
+            ack_id: "ack_id".to_string(),
+            message: PubSubMessage {
+                id: "id".to_string(),
+                data: String::new(),
+                attributes: HashMap::from([("type".to_string(), "Foo".to_string())]),
+            },
+            delivery_attempt: 1,
+        };
+        let value = json!({"text": "test"});
+        let new_value = insert_attribute("type", &received_message, value);
+        assert!(new_value.is_ok());
+        let new_value = new_value.unwrap();
+        assert_eq!(new_value, json!({"text": "test", "type": "Foo"}));
+    }
+
+    #[test]
+    fn insert_attribute_error_missing_attribute() {
+        let received_message = ReceivedMessage {
+            ack_id: "ack_id".to_string(),
+            message: PubSubMessage {
+                id: "id".to_string(),
+                data: String::new(),
+                attributes: HashMap::new(),
+            },
+            delivery_attempt: 1,
+        };
+        let value = json!({"text": "test"});
+        let new_value = insert_attribute("type", &received_message, value);
+        assert!(new_value.is_err());
+        let error = new_value.unwrap_err();
+        assert_eq!(
+            format!("{}", error),
+            "Failed to transform JSON value: Missing attribute `type`"
+        );
+    }
+
+    #[test]
+    fn insert_attribute_error_unexpected_value() {
+        let received_message = ReceivedMessage {
+            ack_id: "ack_id".to_string(),
+            message: PubSubMessage {
+                id: "id".to_string(),
+                data: String::new(),
+                attributes: HashMap::from([("type".to_string(), "Foo".to_string())]),
+            },
+            delivery_attempt: 1,
+        };
+        let value = json!(json!([]));
+        let new_value = insert_attribute("type", &received_message, value);
+        assert!(new_value.is_err());
+        let error = new_value.unwrap_err();
+        assert_eq!(
+            format!("{}", error),
+            "Failed to transform JSON value: Unexpected JSON value `[]`"
         );
     }
 }

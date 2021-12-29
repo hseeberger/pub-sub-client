@@ -1,10 +1,9 @@
-use std::time::Duration;
-use std::{env, vec};
-
 use pub_sub_client::PubSubClient;
 use reqwest::{Client, StatusCode};
 use serde::Deserialize;
 use serde_json::json;
+use std::time::Duration;
+use std::{env, vec};
 use testcontainers::clients::Cli;
 use testcontainers::images::google_cloud_sdk_emulators::{CloudSdk, PUBSUB_PORT};
 
