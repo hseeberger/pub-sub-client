@@ -83,7 +83,7 @@ async fn test() {
     // Create PubSubClient
     env::set_var("PUB_SUB_BASE_URL", base_url);
     let pub_sub_client = PubSubClient::new(
-        "examples/akka-serverless-playground-cea91d34cf9e.json",
+        "secrets/cryptic-hawk-336616-e228f9680cbc.json",
         Duration::from_secs(30),
     );
     env::set_var("PUB_SUB_BASE_URL", "");
