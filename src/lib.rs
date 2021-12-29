@@ -13,7 +13,7 @@ use std::collections::HashMap;
 use std::env;
 use std::time::Duration;
 
-const BASE_URL: &str = "PUB_SUB_BASE_URL";
+const BASE_URL_ENV_VAR: &str = "PUB_SUB_BASE_URL";
 const DEFAULT_BASE_URL: &str = "https://pubsub.googleapis.com";
 
 pub struct PubSubClient {
@@ -159,7 +159,7 @@ impl PubSubClient {
         Ok(Self {
             token_fetcher: TokenFetcher::new(jwt, credentials, refresh_buffer),
             reqwest_client: reqwest::Client::new(),
-            base_url: env::var(BASE_URL).unwrap_or(DEFAULT_BASE_URL.to_string()),
+            base_url: env::var(BASE_URL_ENV_VAR).unwrap_or(DEFAULT_BASE_URL.to_string()),
         })
     }
 

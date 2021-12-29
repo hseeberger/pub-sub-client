@@ -131,7 +131,7 @@ async fn test() {
     let response = pub_sub_client.acknowledge(TEST_SUBSCRIPTION, ack_ids).await;
     assert!(response.is_ok());
 
-    // Pull again and make sure result is empty
+    // Pull again
     let response = pub_sub_client
         .pull_insert_attribute::<Message>(TEST_SUBSCRIPTION, 42, "type")
         .await;
@@ -141,4 +141,10 @@ async fn test() {
 
     assert!(response[0].is_ok());
     assert_eq!(response[0].as_ref().unwrap().id, message_id_3);
+
+    // Acknowledge with invalid ACK ID
+    let response = pub_sub_client
+        .acknowledge(TEST_SUBSCRIPTION, vec!["invalid"])
+        .await;
+    assert!(response.is_err());
 }
