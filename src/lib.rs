@@ -65,7 +65,7 @@ impl Error {
                     serde_json::from_str::<Value>(&e).unwrap_or(Value::Null)["error"]["message"]
                         .to_string()
                 })
-                .unwrap_or("Failed to get text for HTTP body".to_string()),
+                .unwrap_or_else(|_| "Failed to get text for HTTP body".to_string()),
         )
     }
 }
@@ -157,7 +157,7 @@ impl PubSubClient {
         Ok(Self {
             token_fetcher: TokenFetcher::new(jwt, credentials, refresh_buffer),
             reqwest_client: reqwest::Client::new(),
-            base_url: env::var(BASE_URL_ENV_VAR).unwrap_or(DEFAULT_BASE_URL.to_string()),
+            base_url: env::var(BASE_URL_ENV_VAR).unwrap_or_else(|_| DEFAULT_BASE_URL.to_string()),
         })
     }
 
