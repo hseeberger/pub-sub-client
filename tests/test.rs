@@ -13,7 +13,6 @@ const SUBSCRIPTION_ID: &str = "test-subscription";
 const TEXT: &str = "test-text";
 
 #[derive(Debug, Deserialize, PartialEq, Eq)]
-#[serde(tag = "type")]
 enum Message {
     Foo { text: String },
     Bar { text: String },
@@ -51,30 +50,16 @@ async fn test() {
     assert_eq!(response.status(), StatusCode::OK);
 
     // Publish to topic
-    let data = base64::encode(json!({ "text": TEXT }).to_string());
+    let foo = base64::encode(json!({ "Foo": { "text": TEXT } }).to_string());
+    let bar = base64::encode(json!({ "Bar": { "text": TEXT } }).to_string());
     let response = reqwest_client
         .post(format!("{}/v1/{}:publish", base_url, topic_name))
         .json(&json!(
           {
             "messages": [
-              {
-                "data": data,
-                "attributes": {
-                  "type": "Foo"
-                }
-              },
-              {
-                "data": data,
-                "attributes": {
-                  "type": "Bar"
-                }
-              },
-              {
-                "data": data,
-                "attributes": {
-                  "type": "Bar"
-                }
-              }
+              { "data": foo },
+              { "data": bar },
+              { "data": bar }
             ]
           }
         ))
@@ -95,9 +80,7 @@ async fn test() {
     let pub_sub_client = pub_sub_client.unwrap();
 
     // Pull
-    let response = pub_sub_client
-        .pull_insert_attribute::<Message>(SUBSCRIPTION_ID, 42, "type")
-        .await;
+    let response = pub_sub_client.pull::<Message>(SUBSCRIPTION_ID, 42).await;
     assert!(response.is_ok());
     let response = response.unwrap();
     assert_eq!(response.len(), 3);
@@ -135,9 +118,7 @@ async fn test() {
     assert!(response.is_ok());
 
     // Pull again
-    let response = pub_sub_client
-        .pull_insert_attribute::<Message>(SUBSCRIPTION_ID, 42, "type")
-        .await;
+    let response = pub_sub_client.pull::<Message>(SUBSCRIPTION_ID, 42).await;
     assert!(response.is_ok());
     let response = response.unwrap();
     assert_eq!(response.len(), 1);

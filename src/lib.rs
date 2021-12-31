@@ -5,7 +5,7 @@ use goauth::scopes::Scope;
 use reqwest::Response;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
+use serde_json::Value;
 use smpl_jwt::Jwt;
 use std::collections::HashMap;
 use std::env;
@@ -51,8 +51,8 @@ pub enum Error {
     NoBase64 { source: base64::DecodeError },
     #[error("Deserializing data of received message failed")]
     Deserialize { source: serde_json::Error },
-    #[error("Failed to transform JSON value: {reason}")]
-    Transform { reason: String },
+    #[error("Failed to transform JSON value: {0}")]
+    Transform(String),
 }
 
 impl Error {
@@ -172,18 +172,6 @@ impl PubSubClient {
             .await
     }
 
-    pub async fn pull_insert_attribute<M: DeserializeOwned>(
-        &self,
-        subscription_id: &str,
-        max_messages: u32,
-        key: &str,
-    ) -> Result<Vec<Result<MessageEnvelope<M>, Error>>, Error> {
-        self.pull_with_transform(subscription_id, max_messages, |received_message, value| {
-            insert_attribute(key, received_message, value)
-        })
-        .await
-    }
-
     pub async fn pull_with_transform<M, T>(
         &self,
         subscription_id: &str,
@@ -194,6 +182,16 @@ impl PubSubClient {
         M: DeserializeOwned,
         T: Fn(&ReceivedMessage, Value) -> Result<Value, Error>,
     {
+        let received_messages = self.pull_raw(subscription_id, max_messages).await?;
+        let messages = deserialize(received_messages, transform);
+        Ok(messages)
+    }
+
+    pub async fn pull_raw(
+        &self,
+        subscription_id: &str,
+        max_messages: u32,
+    ) -> Result<Vec<ReceivedMessage>, Error> {
         let url = format!(
             "{}/v1/projects/{}/subscriptions/{}:pull",
             self.base_url, self.project_id, subscription_id
@@ -210,8 +208,7 @@ impl PubSubClient {
             .await
             .map_err(|source| Error::UnexpectedHttpResponse { source })?;
 
-        let messages = messages_from_pull_response(pull_response, transform);
-        Ok(messages)
+        Ok(pull_response.received_messages)
     }
 
     /// According to how Google Cloud Pub/Sub works, passing at least one invalid ACK ID fails the
@@ -253,16 +250,15 @@ impl PubSubClient {
     }
 }
 
-fn messages_from_pull_response<M, T>(
-    response: PullResponse,
+fn deserialize<M, T>(
+    received_messages: Vec<ReceivedMessage>,
     transform: T,
 ) -> Vec<Result<MessageEnvelope<M>, Error>>
 where
     M: DeserializeOwned,
     T: Fn(&ReceivedMessage, Value) -> Result<Value, Error>,
 {
-    response
-        .received_messages
+    received_messages
         .into_iter()
         .map(|received_message| {
             base64::decode(&received_message.message.data)
@@ -287,40 +283,17 @@ where
         .collect()
 }
 
-pub fn insert_attribute(
-    key: &str,
-    received_message: &ReceivedMessage,
-    value: Value,
-) -> Result<Value, Error> {
-    match received_message.message.attributes.get(key) {
-        Some(v) => match value {
-            Value::Object(mut map) => {
-                map.insert(key.to_string(), json!(v));
-                Ok(Value::Object(map))
-            }
-            other => Err(Error::Transform {
-                reason: format!("Unexpected JSON value `{}`", other),
-            }),
-        },
-        None => Err(Error::Transform {
-            reason: format!("Missing attribute `{}`", key),
-        }),
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use crate::{
-        insert_attribute, messages_from_pull_response, Error, MessageEnvelope, PubSubClient,
-        PubSubMessage, PullResponse, ReceivedMessage,
+        deserialize, Error, MessageEnvelope, PubSubClient, PubSubMessage, ReceivedMessage,
     };
     use serde::Deserialize;
-    use serde_json::json;
+    use serde_json::{json, Value};
     use std::collections::HashMap;
     use std::time::Duration;
 
     #[derive(Debug, Deserialize, PartialEq, Eq)]
-    #[serde(tag = "type")]
     enum Message {
         Foo { text: String },
         Bar { text: String },
@@ -379,23 +352,32 @@ mod tests {
 
     #[test]
     fn messages_from_pull_response_ok() {
-        let received_messages = vec![ReceivedMessage {
-            ack_id: "ack_id".to_string(),
-            message: PubSubMessage {
-                id: "id".to_string(),
-                data: base64::encode(json!({"text": "test"}).to_string()),
-                attributes: HashMap::from([("type".to_string(), "Foo".to_string())]),
+        let received_messages = vec![
+            ReceivedMessage {
+                ack_id: "ack_id".to_string(),
+                message: PubSubMessage {
+                    id: "id".to_string(),
+                    data: base64::encode(json!({"text": "test"}).to_string()),
+                    attributes: HashMap::from([("type".to_string(), "Foo".to_string())]),
+                },
+                delivery_attempt: 1,
             },
-            delivery_attempt: 1,
-        }];
-        let pull_response = PullResponse { received_messages };
-        let mut messages_result: Vec<Result<MessageEnvelope<Message>, Error>> =
-            messages_from_pull_response(pull_response, |received_message, value| {
-                insert_attribute("type", received_message, value)
-            });
-        assert_eq!(messages_result.len(), 1);
+            ReceivedMessage {
+                ack_id: "ack_id".to_string(),
+                message: PubSubMessage {
+                    id: "id".to_string(),
+                    data: base64::encode(json!({"Bar": {"text": "test"}}).to_string()),
+                    attributes: HashMap::from([("version".to_string(), "v2".to_string())]),
+                },
+                delivery_attempt: 1,
+            },
+        ];
+        let messages_result: Vec<Result<MessageEnvelope<Message>, Error>> =
+            deserialize(received_messages, transform);
+        assert_eq!(messages_result.len(), 2);
+
         assert!(messages_result[0].is_ok());
-        let envelope = messages_result.pop().unwrap().unwrap();
+        let envelope = messages_result[0].as_ref().unwrap();
         assert_eq!(envelope.id, "id".to_string());
         assert_eq!(envelope.ack_id, "ack_id".to_string());
         assert_eq!(
@@ -408,90 +390,42 @@ mod tests {
                 text: "test".to_string()
             }
         );
-    }
 
-    #[test]
-    fn messages_from_pull_response_error() {
-        let received_messages = vec![ReceivedMessage {
-            ack_id: "ack_id".to_string(),
-            message: PubSubMessage {
-                id: "id".to_string(),
-                data: base64::encode(json!({"text": "test"}).to_string()),
-                attributes: HashMap::new(),
-            },
-            delivery_attempt: 1,
-        }];
-        let pull_response = PullResponse { received_messages };
-        let mut messages_result: Vec<Result<MessageEnvelope<Message>, Error>> =
-            messages_from_pull_response(pull_response, |received_message, value| {
-                insert_attribute("type", received_message, value)
-            });
-        assert_eq!(messages_result.len(), 1);
-        assert!(messages_result[0].is_err());
-        let error = messages_result.pop().unwrap().unwrap_err();
+        assert!(messages_result[1].is_ok());
+        let envelope = messages_result[1].as_ref().unwrap();
+        assert_eq!(envelope.id, "id".to_string());
+        assert_eq!(envelope.ack_id, "ack_id".to_string());
         assert_eq!(
-            format!("{}", error),
-            "Failed to transform JSON value: Missing attribute `type`"
+            envelope.message,
+            Message::Bar {
+                text: "test".to_string()
+            }
         );
     }
 
-    #[test]
-    fn insert_attribute_ok() {
-        let received_message = ReceivedMessage {
-            ack_id: "ack_id".to_string(),
-            message: PubSubMessage {
-                id: "id".to_string(),
-                data: String::new(),
-                attributes: HashMap::from([("type".to_string(), "Foo".to_string())]),
-            },
-            delivery_attempt: 1,
-        };
-        let value = json!({"text": "test"});
-        let new_value = insert_attribute("type", &received_message, value);
-        assert!(new_value.is_ok());
-        let new_value = new_value.unwrap();
-        assert_eq!(new_value, json!({"text": "test", "type": "Foo"}));
-    }
-
-    #[test]
-    fn insert_attribute_error_missing_attribute() {
-        let received_message = ReceivedMessage {
-            ack_id: "ack_id".to_string(),
-            message: PubSubMessage {
-                id: "id".to_string(),
-                data: String::new(),
-                attributes: HashMap::new(),
-            },
-            delivery_attempt: 1,
-        };
-        let value = json!({"text": "test"});
-        let new_value = insert_attribute("type", &received_message, value);
-        assert!(new_value.is_err());
-        let error = new_value.unwrap_err();
-        assert_eq!(
-            format!("{}", error),
-            "Failed to transform JSON value: Missing attribute `type`"
-        );
-    }
-
-    #[test]
-    fn insert_attribute_error_unexpected_value() {
-        let received_message = ReceivedMessage {
-            ack_id: "ack_id".to_string(),
-            message: PubSubMessage {
-                id: "id".to_string(),
-                data: String::new(),
-                attributes: HashMap::from([("type".to_string(), "Foo".to_string())]),
-            },
-            delivery_attempt: 1,
-        };
-        let value = json!(json!([]));
-        let new_value = insert_attribute("type", &received_message, value);
-        assert!(new_value.is_err());
-        let error = new_value.unwrap_err();
-        assert_eq!(
-            format!("{}", error),
-            "Failed to transform JSON value: Unexpected JSON value `[]`"
-        );
+    fn transform(received_message: &ReceivedMessage, mut value: Value) -> Result<Value, Error> {
+        let attributes = &received_message.message.attributes;
+        match attributes.get("version").map(|v| &v[..]).unwrap_or("v1") {
+            "v1" => {
+                let mut type_keys = attributes
+                    .keys()
+                    .filter(|key| **key == "type" || key.starts_with("type."))
+                    .map(|key| (&key[..], key.split(".").skip(1).collect::<Vec<_>>()))
+                    .collect::<Vec<_>>();
+                type_keys.sort_unstable_by(|v1, v2| v2.1.len().cmp(&v1.1.len()));
+                for (type_key, json_path) in type_keys {
+                    let sub_value = json_path
+                        .iter()
+                        .fold(Some(&mut value), |v, k| v.and_then(|v| v.get_mut(k)));
+                    if let Some(sub_value) = sub_value {
+                        let tpe = attributes.get(type_key).unwrap().to_string();
+                        *sub_value = json!({ tpe: sub_value });
+                    }
+                }
+                Ok(value)
+            }
+            "v2" => Ok(value),
+            unknown => Err(Error::Transform(format!("Unknow version `{}`", unknown))),
+        }
     }
 }
