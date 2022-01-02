@@ -80,7 +80,9 @@ async fn test() {
     let pub_sub_client = pub_sub_client.unwrap();
 
     // Pull
-    let response = pub_sub_client.pull::<Message>(SUBSCRIPTION_ID, 42).await;
+    let response = pub_sub_client
+        .pull::<Message>(SUBSCRIPTION_ID, 42, Some(Duration::from_secs(45)))
+        .await;
     assert!(response.is_ok());
     let response = response.unwrap();
     assert_eq!(response.len(), 3);
@@ -114,11 +116,15 @@ async fn test() {
 
     // Acknowledge
     let ack_ids = vec![ack_id_1, ack_id_2];
-    let response = pub_sub_client.acknowledge(SUBSCRIPTION_ID, ack_ids).await;
+    let response = pub_sub_client
+        .acknowledge(SUBSCRIPTION_ID, ack_ids, Some(Duration::from_secs(10)))
+        .await;
     assert!(response.is_ok());
 
     // Pull again
-    let response = pub_sub_client.pull::<Message>(SUBSCRIPTION_ID, 42).await;
+    let response = pub_sub_client
+        .pull::<Message>(SUBSCRIPTION_ID, 42, Some(Duration::from_secs(45)))
+        .await;
     assert!(response.is_ok());
     let response = response.unwrap();
     assert_eq!(response.len(), 1);
@@ -128,7 +134,11 @@ async fn test() {
 
     // Acknowledge with invalid ACK ID
     let response = pub_sub_client
-        .acknowledge(SUBSCRIPTION_ID, vec!["invalid"])
+        .acknowledge(
+            SUBSCRIPTION_ID,
+            vec!["invalid"],
+            Some(Duration::from_secs(10)),
+        )
         .await;
     assert!(response.is_err());
 }

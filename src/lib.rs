@@ -167,8 +167,9 @@ impl PubSubClient {
         &self,
         subscription_id: &str,
         max_messages: u32,
+        timeout: Option<Duration>,
     ) -> Result<Vec<Result<MessageEnvelope<M>, Error>>, Error> {
-        self.pull_with_transform(subscription_id, max_messages, |_, value| Ok(value))
+        self.pull_with_transform(subscription_id, max_messages, timeout, |_, value| Ok(value))
             .await
     }
 
@@ -176,13 +177,16 @@ impl PubSubClient {
         &self,
         subscription_id: &str,
         max_messages: u32,
+        timeout: Option<Duration>,
         transform: T,
     ) -> Result<Vec<Result<MessageEnvelope<M>, Error>>, Error>
     where
         M: DeserializeOwned,
         T: Fn(&ReceivedMessage, Value) -> Result<Value, Error>,
     {
-        let received_messages = self.pull_raw(subscription_id, max_messages).await?;
+        let received_messages = self
+            .pull_raw(subscription_id, max_messages, timeout)
+            .await?;
         let messages = deserialize(received_messages, transform);
         Ok(messages)
     }
@@ -191,13 +195,14 @@ impl PubSubClient {
         &self,
         subscription_id: &str,
         max_messages: u32,
+        timeout: Option<Duration>,
     ) -> Result<Vec<ReceivedMessage>, Error> {
         let url = format!(
             "{}/v1/projects/{}/subscriptions/{}:pull",
             self.base_url, self.project_id, subscription_id
         );
         let request = PullRequest { max_messages };
-        let response = self.send_request(&url, &request).await?;
+        let response = self.send_request(&url, &request, timeout).await?;
 
         if !response.status().is_success() {
             return Err(Error::unexpected_http_status_code_from_response(response).await);
@@ -217,13 +222,14 @@ impl PubSubClient {
         &self,
         subscription_id: &str,
         ack_ids: Vec<&str>,
+        timeout: Option<Duration>,
     ) -> Result<(), Error> {
         let url = format!(
             "{}/v1/projects/{}/subscriptions/{}:acknowledge",
             self.base_url, self.project_id, subscription_id
         );
         let request = AcknowledgeRequest { ack_ids };
-        let response = self.send_request(&url, &request).await?;
+        let response = self.send_request(&url, &request, timeout).await?;
 
         if !response.status().is_success() {
             return Err(Error::unexpected_http_status_code_from_response(response).await);
@@ -232,17 +238,26 @@ impl PubSubClient {
         Ok(())
     }
 
-    async fn send_request<R: Serialize>(&self, url: &str, request: &R) -> Result<Response, Error> {
+    async fn send_request<R: Serialize>(
+        &self,
+        url: &str,
+        request: &R,
+        timeout: Option<Duration>,
+    ) -> Result<Response, Error> {
         let token = self
             .token_fetcher
             .fetch_token()
             .await
             .map_err(|source| Error::TokenFetch { source })?;
-        let response = self
+
+        let request = self
             .reqwest_client
             .post(url)
             .bearer_auth(token.access_token())
-            .json(request)
+            .json(request);
+        let request = timeout.into_iter().fold(request, |r, t| r.timeout(t));
+
+        let response = request
             .send()
             .await
             .map_err(|source| Error::HttpServiceCommunication { source })?;
@@ -300,13 +315,13 @@ mod tests {
     }
 
     #[test]
-    fn new_ok() {
+    fn test_new_ok() {
         let result = PubSubClient::new("tests/valid_key.json", Duration::from_secs(30));
         assert!(result.is_ok());
     }
 
     #[test]
-    fn new_err_non_existent_key() {
+    fn test_new_err_non_existent_key() {
         let result = PubSubClient::new("non_existent", Duration::from_secs(30));
         assert!(result.is_err());
         match result.unwrap_err() {
@@ -322,7 +337,7 @@ mod tests {
     }
 
     #[test]
-    fn new_err_invalid_key() {
+    fn test_new_err_invalid_key() {
         let result = PubSubClient::new("Cargo.toml", Duration::from_secs(30));
         assert!(result.is_err());
         match result.unwrap_err() {
@@ -338,7 +353,7 @@ mod tests {
     }
 
     #[test]
-    fn new_err_invalid_private_key() {
+    fn test_new_err_invalid_private_key() {
         let result = PubSubClient::new("tests/invalid_key.json", Duration::from_secs(30));
         assert!(result.is_err());
         match result.unwrap_err() {
@@ -351,7 +366,7 @@ mod tests {
     }
 
     #[test]
-    fn messages_from_pull_response_ok() {
+    fn test_deserialize_ok() {
         let received_messages = vec![
             ReceivedMessage {
                 ack_id: "ack_id".to_string(),

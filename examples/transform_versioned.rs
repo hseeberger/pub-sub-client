@@ -30,7 +30,7 @@ async fn run() -> Result<(), Error> {
     )?;
 
     let msg_envelopes: Vec<Result<MessageEnvelope<Message>, Error>> = pub_sub_client
-        .pull_with_transform(SUBSCRIPTION, 42, transform)
+        .pull_with_transform(SUBSCRIPTION, 42, Some(Duration::from_secs(45)), transform)
         .await?;
 
     for msg_envelope in msg_envelopes {
@@ -40,7 +40,7 @@ async fn run() -> Result<(), Error> {
             m.id, m.message, m.delivery_attempt
         );
         match pub_sub_client
-            .acknowledge(SUBSCRIPTION, vec![&m.ack_id])
+            .acknowledge(SUBSCRIPTION, vec![&m.ack_id], Some(Duration::from_secs(10)))
             .await
         {
             Ok(_) => println!("Successfully acknowledged"),
