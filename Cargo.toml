@@ -1,6 +1,6 @@
 [package]
 name = "pub-sub-client"
-version = "0.3.1"
+version = "0.4.1"
 edition = "2021"
 
 description = "Client library for Google Cloud Pub/Sub"
