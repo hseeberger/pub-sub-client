@@ -9,9 +9,8 @@ use serde_json::Value;
 use smpl_jwt::Jwt;
 use std::collections::HashMap;
 use std::env;
+use std::error::Error as StdError;
 use std::time::Duration;
-
-type BoxedStdError = Box<dyn std::error::Error>;
 
 const BASE_URL_ENV_VAR: &str = "PUB_SUB_BASE_URL";
 const DEFAULT_BASE_URL: &str = "https://pubsub.googleapis.com";
@@ -54,7 +53,9 @@ pub enum Error {
     #[error("Deserializing data of received message failed")]
     Deserialize { source: serde_json::Error },
     #[error("Failed to transform JSON value")]
-    Transform { source: BoxedStdError },
+    Transform {
+        source: Box<dyn StdError + Send + Sync + 'static>,
+    },
 }
 
 impl Error {
@@ -184,7 +185,7 @@ impl PubSubClient {
     ) -> Result<Vec<Result<MessageEnvelope<M>, Error>>, Error>
     where
         M: DeserializeOwned,
-        T: Fn(&ReceivedMessage, Value) -> Result<Value, BoxedStdError>,
+        T: Fn(&ReceivedMessage, Value) -> Result<Value, Box<dyn StdError + Send + Sync + 'static>>,
     {
         let received_messages = self
             .pull_raw(subscription_id, max_messages, timeout)
@@ -273,7 +274,7 @@ fn deserialize<M, T>(
 ) -> Vec<Result<MessageEnvelope<M>, Error>>
 where
     M: DeserializeOwned,
-    T: Fn(&ReceivedMessage, Value) -> Result<Value, BoxedStdError>,
+    T: Fn(&ReceivedMessage, Value) -> Result<Value, Box<dyn StdError + Send + Sync + 'static>>,
 {
     received_messages
         .into_iter()
@@ -306,13 +307,13 @@ where
 #[cfg(test)]
 mod tests {
     use crate::{
-        deserialize, BoxedStdError, Error, MessageEnvelope, PubSubClient, PubSubMessage,
-        ReceivedMessage,
+        deserialize, Error, MessageEnvelope, PubSubClient, PubSubMessage, ReceivedMessage,
     };
     use anyhow::anyhow;
     use serde::Deserialize;
     use serde_json::{json, Value};
     use std::collections::HashMap;
+    use std::error::Error as StdError;
     use std::time::Duration;
 
     #[derive(Debug, Deserialize, PartialEq, Eq)]
@@ -428,7 +429,7 @@ mod tests {
     fn transform(
         received_message: &ReceivedMessage,
         mut value: Value,
-    ) -> Result<Value, BoxedStdError> {
+    ) -> Result<Value, Box<dyn StdError + Send + Sync + 'static>> {
         let attributes = &received_message.message.attributes;
         match attributes.get("version").map(|v| &v[..]).unwrap_or("v1") {
             "v1" => {

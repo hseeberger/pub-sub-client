@@ -40,13 +40,11 @@ async fn run() -> Result<(), Error> {
             "id: {}, message: {:?}, delivery_attempt: {}",
             m.id, m.message, m.delivery_attempt
         );
-        match pub_sub_client
+
+        pub_sub_client
             .acknowledge(SUBSCRIPTION, vec![&m.ack_id], Some(Duration::from_secs(10)))
-            .await
-        {
-            Ok(_) => println!("Successfully acknowledged"),
-            Err(e) => eprintln!("ERROR: {}", e),
-        }
+            .await?;
+        println!("Successfully acknowledged");
     }
 
     Ok(())
@@ -55,7 +53,7 @@ async fn run() -> Result<(), Error> {
 fn transform(
     received_message: &ReceivedMessage,
     mut value: Value,
-) -> Result<Value, Box<dyn std::error::Error>> {
+) -> Result<Value, Box<dyn std::error::Error + Send + Sync + 'static>> {
     let attributes = &received_message.message.attributes;
     match attributes.get("version").map(|v| &v[..]).unwrap_or("v1") {
         "v1" => {
