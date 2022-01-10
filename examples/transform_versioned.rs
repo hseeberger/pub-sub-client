@@ -1,3 +1,4 @@
+use anyhow::anyhow;
 use pub_sub_client::{Error, MessageEnvelope, PubSubClient, ReceivedMessage};
 use serde::Deserialize;
 use serde_json::{json, Value};
@@ -51,7 +52,10 @@ async fn run() -> Result<(), Error> {
     Ok(())
 }
 
-fn transform(received_message: &ReceivedMessage, mut value: Value) -> Result<Value, Error> {
+fn transform(
+    received_message: &ReceivedMessage,
+    mut value: Value,
+) -> Result<Value, Box<dyn std::error::Error>> {
     let attributes = &received_message.message.attributes;
     match attributes.get("version").map(|v| &v[..]).unwrap_or("v1") {
         "v1" => {
@@ -73,6 +77,6 @@ fn transform(received_message: &ReceivedMessage, mut value: Value) -> Result<Val
             Ok(value)
         }
         "v2" => Ok(value),
-        unknown => Err(Error::Transform(format!("Unknow version `{}`", unknown))),
+        unknown => Err(anyhow!("Unknow version `{}`", unknown).into()),
     }
 }

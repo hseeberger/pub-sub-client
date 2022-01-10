@@ -11,6 +11,8 @@ use std::collections::HashMap;
 use std::env;
 use std::time::Duration;
 
+type BoxedStdError = Box<dyn std::error::Error>;
+
 const BASE_URL_ENV_VAR: &str = "PUB_SUB_BASE_URL";
 const DEFAULT_BASE_URL: &str = "https://pubsub.googleapis.com";
 
@@ -51,8 +53,8 @@ pub enum Error {
     NoBase64 { source: base64::DecodeError },
     #[error("Deserializing data of received message failed")]
     Deserialize { source: serde_json::Error },
-    #[error("Failed to transform JSON value: {0}")]
-    Transform(String),
+    #[error("Failed to transform JSON value")]
+    Transform { source: BoxedStdError },
 }
 
 impl Error {
@@ -182,7 +184,7 @@ impl PubSubClient {
     ) -> Result<Vec<Result<MessageEnvelope<M>, Error>>, Error>
     where
         M: DeserializeOwned,
-        T: Fn(&ReceivedMessage, Value) -> Result<Value, Error>,
+        T: Fn(&ReceivedMessage, Value) -> Result<Value, BoxedStdError>,
     {
         let received_messages = self
             .pull_raw(subscription_id, max_messages, timeout)
@@ -271,7 +273,7 @@ fn deserialize<M, T>(
 ) -> Vec<Result<MessageEnvelope<M>, Error>>
 where
     M: DeserializeOwned,
-    T: Fn(&ReceivedMessage, Value) -> Result<Value, Error>,
+    T: Fn(&ReceivedMessage, Value) -> Result<Value, BoxedStdError>,
 {
     received_messages
         .into_iter()
@@ -282,7 +284,10 @@ where
                     serde_json::from_slice::<Value>(&decoded_data)
                         .map_err(|source| Error::Deserialize { source })
                 })
-                .and_then(|value| transform(&received_message, value))
+                .and_then(|value| {
+                    transform(&received_message, value)
+                        .map_err(|source| Error::Transform { source })
+                })
                 .and_then(|transformed_value| {
                     serde_json::from_value(transformed_value)
                         .map_err(|source| Error::Deserialize { source })
@@ -301,8 +306,10 @@ where
 #[cfg(test)]
 mod tests {
     use crate::{
-        deserialize, Error, MessageEnvelope, PubSubClient, PubSubMessage, ReceivedMessage,
+        deserialize, BoxedStdError, Error, MessageEnvelope, PubSubClient, PubSubMessage,
+        ReceivedMessage,
     };
+    use anyhow::anyhow;
     use serde::Deserialize;
     use serde_json::{json, Value};
     use std::collections::HashMap;
@@ -418,7 +425,10 @@ mod tests {
         );
     }
 
-    fn transform(received_message: &ReceivedMessage, mut value: Value) -> Result<Value, Error> {
+    fn transform(
+        received_message: &ReceivedMessage,
+        mut value: Value,
+    ) -> Result<Value, BoxedStdError> {
         let attributes = &received_message.message.attributes;
         match attributes.get("version").map(|v| &v[..]).unwrap_or("v1") {
             "v1" => {
@@ -440,7 +450,7 @@ mod tests {
                 Ok(value)
             }
             "v2" => Ok(value),
-            unknown => Err(Error::Transform(format!("Unknow version `{}`", unknown))),
+            unknown => Err(anyhow!("Unknow version `{}`", unknown).into()),
         }
     }
 }
