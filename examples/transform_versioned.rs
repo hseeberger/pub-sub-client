@@ -1,5 +1,5 @@
 use anyhow::anyhow;
-use pub_sub_client::{Error, MessageEnvelope, PubSubClient, ReceivedMessage};
+use pub_sub_client::{Error, PubSubClient, ReceivedMessage};
 use serde::Deserialize;
 use serde_json::{json, Value};
 use std::error::Error as _;
@@ -30,8 +30,13 @@ async fn run() -> Result<(), Error> {
         Duration::from_secs(30),
     )?;
 
-    let msg_envelopes: Vec<Result<MessageEnvelope<Message>, Error>> = pub_sub_client
-        .pull_with_transform(SUBSCRIPTION, 42, Some(Duration::from_secs(45)), transform)
+    let msg_envelopes = pub_sub_client
+        .pull_with_transform::<Message, _>(
+            SUBSCRIPTION,
+            42,
+            Some(Duration::from_secs(45)),
+            transform,
+        )
         .await?;
 
     for msg_envelope in msg_envelopes {
