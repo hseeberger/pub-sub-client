@@ -1,0 +1,21 @@
+name: test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  lint-and-test:
+    runs-on: ubuntu-20.04
+    steps:
+      - uses: actions/checkout@v2
+      - run: rustup update
+      - run: cargo clippy -- -D warnings
+      - name: Run `cargo test`
+        env:
+          GCP_SERVICE_ACCOUNT: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+        run: |
+          printenv GCP_SERVICE_ACCOUNT > secrets/cryptic-hawk-336616-e228f9680cbc.json
+          cargo test

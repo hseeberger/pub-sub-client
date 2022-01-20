@@ -70,6 +70,8 @@ async fn test() {
     assert_eq!(response.status(), StatusCode::OK);
 
     // Create PubSubClient
+    // Notice: GitHub Actions write the `GCP_SERVICE_ACCOUNT` secret to the below key path,
+    // locally `secrets/cryptic-hawk-336616-e228f9680cbc.json.gpg` must be decrypted.
     env::set_var("PUB_SUB_BASE_URL", base_url);
     let pub_sub_client = PubSubClient::new(
         "secrets/cryptic-hawk-336616-e228f9680cbc.json",
