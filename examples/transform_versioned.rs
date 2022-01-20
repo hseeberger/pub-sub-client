@@ -17,7 +17,7 @@ enum Message {
 #[tokio::main]
 async fn main() {
     if let Err(e) = run().await {
-        eprintln!("ERRORx: {}", e);
+        eprintln!("ERROR: {}", e);
         if let Some(e) = e.source() {
             eprintln!("SOURCE: {}", e);
         }
