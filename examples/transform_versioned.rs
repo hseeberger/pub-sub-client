@@ -1,5 +1,5 @@
 use anyhow::anyhow;
-use pub_sub_client::{Error, PubSubClient, ReceivedMessage};
+use pub_sub_client::{Error, MessageEnvelope, PubSubClient, ReceivedMessage};
 use serde::Deserialize;
 use serde_json::{json, Value};
 use std::error::Error as _;
@@ -17,9 +17,9 @@ enum Message {
 #[tokio::main]
 async fn main() {
     if let Err(e) = run().await {
-        eprintln!("ERROR: {}", e);
+        eprintln!("ERROR: {e}");
         if let Some(e) = e.source() {
-            eprintln!("SOURCE: {}", e);
+            eprintln!("SOURCE: {e}");
         }
     }
 }
@@ -40,14 +40,17 @@ async fn run() -> Result<(), Error> {
         .await?;
 
     for msg_envelope in msg_envelopes {
-        let m = msg_envelope?;
-        println!(
-            "id: {}, message: {:?}, delivery_attempt: {}",
-            m.id, m.message, m.delivery_attempt
-        );
+        let MessageEnvelope {
+            id,
+            ack_id,
+            attributes: _,
+            message,
+            delivery_attempt,
+        } = msg_envelope?;
+        println!("id: {id}, message: {message:?}, delivery_attempt: {delivery_attempt}");
 
         pub_sub_client
-            .acknowledge(SUBSCRIPTION, vec![&m.ack_id], Some(Duration::from_secs(10)))
+            .acknowledge(SUBSCRIPTION, vec![&ack_id], Some(Duration::from_secs(10)))
             .await?;
         println!("Successfully acknowledged");
     }
@@ -80,6 +83,6 @@ fn transform(
             Ok(value)
         }
         "v2" => Ok(value),
-        unknown => Err(anyhow!("Unknow version `{}`", unknown).into()),
+        unknown => Err(anyhow!("Unknow version `{unknown}`").into()),
     }
 }

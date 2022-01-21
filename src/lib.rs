@@ -8,6 +8,8 @@ use goauth::auth::JwtClaims;
 use goauth::credentials::Credentials;
 use goauth::fetcher::TokenFetcher;
 use goauth::scopes::Scope;
+use reqwest::Response;
+use serde::Serialize;
 use smpl_jwt::Jwt;
 use std::env;
 use std::time::Duration;
@@ -34,10 +36,7 @@ impl PubSubClient {
     pub fn new(key_path: &str, refresh_buffer: Duration) -> Result<Self, Error> {
         let credentials =
             Credentials::from_file(key_path).map_err(|source| Error::Initialization {
-                reason: format!(
-                    "Missing or malformed service account key file at `{}`",
-                    key_path
-                ),
+                reason: format!("Missing or malformed service account key at `{key_path}`"),
                 source,
             })?;
 
@@ -52,10 +51,7 @@ impl PubSubClient {
             credentials
                 .rsa_key()
                 .map_err(|source| Error::Initialization {
-                    reason: format!(
-                        "Malformed private key as part of service account key file at `{}`",
-                        key_path
-                    ),
+                    reason: format!("Malformed private key in service account key at `{key_path}`"),
                     source,
                 })?,
             None,
@@ -73,6 +69,32 @@ impl PubSubClient {
             token_fetcher: TokenFetcher::new(jwt, credentials, refresh_buffer),
             reqwest_client: reqwest::Client::new(),
         })
+    }
+
+    async fn send_request<R: Serialize>(
+        &self,
+        url: &str,
+        request: &R,
+        timeout: Option<Duration>,
+    ) -> Result<Response, Error> {
+        let token = self
+            .token_fetcher
+            .fetch_token()
+            .await
+            .map_err(|source| Error::TokenFetch { source })?;
+
+        let request = self
+            .reqwest_client
+            .post(url)
+            .bearer_auth(token.access_token())
+            .json(request);
+        let request = timeout.into_iter().fold(request, |r, t| r.timeout(t));
+
+        let response = request
+            .send()
+            .await
+            .map_err(|source| Error::HttpServiceCommunication { source })?;
+        Ok(response)
     }
 }
 
@@ -103,10 +125,7 @@ mod tests {
                 reason: _,
                 source: _,
             } => (),
-            other => panic!(
-                "Expected Error::InvalidServiceAccountKey, but was {}",
-                other
-            ),
+            other => panic!("Expected Error::InvalidServiceAccountKey, but was `{other}`"),
         }
     }
 
@@ -119,10 +138,7 @@ mod tests {
                 reason: _,
                 source: _,
             } => (),
-            other => panic!(
-                "Expected Error::InvalidServiceAccountKey, but was {}",
-                other
-            ),
+            other => panic!("Expected Error::InvalidServiceAccountKey, but was `{other}`"),
         }
     }
 
@@ -135,7 +151,7 @@ mod tests {
                 reason: _,
                 source: _,
             } => (),
-            other => panic!("Expected Error::InvalidPrivateKey, but was {}", other),
+            other => panic!("Expected Error::InvalidPrivateKey, but was `{other}`"),
         }
     }
 }
