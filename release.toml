@@ -1,0 +1,2 @@
+pre-release-commit-message = "release: {{version}}"
+post-release-commit-message = "release: bumping version to {{version}}"
