@@ -90,12 +90,10 @@ impl PubSubClient {
         max_messages: u32,
         timeout: Option<Duration>,
     ) -> Result<Vec<ReceivedMessage>, Error> {
-        let url = format!(
-            "{}/v1/projects/{}/subscriptions/{}:pull",
-            self.base_url, self.project_id, subscription_id
-        );
         let request = PullRequest { max_messages };
-        let response = self.send_request(&url, &request, timeout).await?;
+        let response = self
+            .send_request(&self.url(subscription_id, "pull"), &request, timeout)
+            .await?;
 
         if !response.status().is_success() {
             return Err(unexpected_http_status_code(response).await);
@@ -117,12 +115,10 @@ impl PubSubClient {
         ack_ids: Vec<&str>,
         timeout: Option<Duration>,
     ) -> Result<(), Error> {
-        let url = format!(
-            "{}/v1/projects/{}/subscriptions/{}:acknowledge",
-            self.base_url, self.project_id, subscription_id
-        );
         let request = AcknowledgeRequest { ack_ids };
-        let response = self.send_request(&url, &request, timeout).await?;
+        let response = self
+            .send_request(&self.url(subscription_id, "acknowledge"), &request, timeout)
+            .await?;
 
         if !response.status().is_success() {
             return Err(unexpected_http_status_code(response).await);
@@ -131,30 +127,10 @@ impl PubSubClient {
         Ok(())
     }
 
-    async fn send_request<R: Serialize>(
-        &self,
-        url: &str,
-        request: &R,
-        timeout: Option<Duration>,
-    ) -> Result<Response, Error> {
-        let token = self
-            .token_fetcher
-            .fetch_token()
-            .await
-            .map_err(|source| Error::TokenFetch { source })?;
-
-        let request = self
-            .reqwest_client
-            .post(url)
-            .bearer_auth(token.access_token())
-            .json(request);
-        let request = timeout.into_iter().fold(request, |r, t| r.timeout(t));
-
-        let response = request
-            .send()
-            .await
-            .map_err(|source| Error::HttpServiceCommunication { source })?;
-        Ok(response)
+    fn url(&self, subscription_id: &str, action: &str) -> String {
+        let base_url = &self.base_url;
+        let project_id = &self.project_id;
+        format!("{base_url}/v1/projects/{project_id}/subscriptions/{subscription_id}:{action}")
     }
 }
 
@@ -303,7 +279,7 @@ mod tests {
                 Ok(value)
             }
             "v2" => Ok(value),
-            unknown => Err(anyhow!("Unknow version `{}`", unknown).into()),
+            unknown => Err(anyhow!("Unknow version `{unknown}`").into()),
         }
     }
 }

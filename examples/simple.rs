@@ -13,9 +13,9 @@ struct Message {
 #[tokio::main]
 async fn main() {
     if let Err(e) = run().await {
-        eprintln!("ERRORx: {}", e);
+        eprintln!("ERROR: {e}");
         if let Some(e) = e.source() {
-            eprintln!("SOURCE: {}", e);
+            eprintln!("SOURCE: {e}");
         }
     }
 }
@@ -32,7 +32,9 @@ async fn run() -> Result<(), Error> {
 
     for envelope in envelopes {
         let envelope = envelope?;
-        println!("Message text: {}", envelope.message.text);
+
+        let text = envelope.message.text;
+        println!("Message text: {text}");
 
         pub_sub_client
             .acknowledge(SUBSCRIPTION, vec![&envelope.ack_id], None)

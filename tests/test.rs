@@ -23,16 +23,17 @@ async fn test() {
     // Set up testcontainers
     let docker_cli = Cli::default();
     let node = docker_cli.run(CloudSdk::pubsub());
-    let base_url = format!("http://localhost:{}", node.get_host_port(PUBSUB_PORT));
-    let topic_name = format!("projects/{}/topics/{}", PROJECT_ID, TOPIC_ID);
-    let subscription_name = format!("projects/{}/subscriptions/{}", PROJECT_ID, SUBSCRIPTION_ID);
+    let pubsub_port = node.get_host_port(PUBSUB_PORT);
+    let base_url = format!("http://localhost:{pubsub_port}");
+    let topic_name = format!("projects/{PROJECT_ID}/topics/{TOPIC_ID}");
+    let subscription_name = format!("projects/{PROJECT_ID}/subscriptions/{SUBSCRIPTION_ID}");
 
     // We interact with Pub/Sub via HTTP
     let reqwest_client = Client::new();
 
     // Create topic
     let response = reqwest_client
-        .put(format!("{}/v1/{}", base_url, topic_name))
+        .put(format!("{base_url}/v1/{topic_name}"))
         .send()
         .await;
     assert!(response.is_ok());
@@ -41,7 +42,7 @@ async fn test() {
 
     // Create subscription
     let response = reqwest_client
-        .put(format!("{}/v1/{}", base_url, subscription_name))
+        .put(format!("{base_url}/v1/{subscription_name}"))
         .json(&json!({ "topic": topic_name }))
         .send()
         .await;
@@ -53,7 +54,7 @@ async fn test() {
     let foo = base64::encode(json!({ "Foo": { "text": TEXT } }).to_string());
     let bar = base64::encode(json!({ "Bar": { "text": TEXT } }).to_string());
     let response = reqwest_client
-        .post(format!("{}/v1/{}:publish", base_url, topic_name))
+        .post(format!("{base_url}/v1/{topic_name}:publish"))
         .json(&json!(
           {
             "messages": [
