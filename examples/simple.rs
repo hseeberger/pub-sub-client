@@ -1,4 +1,5 @@
-use pub_sub_client::{Error, PubSubClient};
+use pub_sub_client::error::Error;
+use pub_sub_client::PubSubClient;
 use serde::Deserialize;
 use std::error::Error as _;
 use std::time::Duration;

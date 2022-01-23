@@ -1,5 +1,8 @@
 use std::error::Error as StdError;
 
+use reqwest::Response;
+use serde_json::Value;
+
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
     #[error("Initialization error: {reason}")]
@@ -22,8 +25,28 @@ pub enum Error {
     NoBase64 { source: base64::DecodeError },
     #[error("Deserializing data of received message failed")]
     Deserialize { source: serde_json::Error },
+    #[error("Serializing of message to be published failed")]
+    Serialize { source: serde_json::Error },
     #[error("Failed to transform JSON value")]
     Transform {
         source: Box<dyn StdError + Send + Sync + 'static>,
     },
+}
+
+impl Error {
+    pub async fn unexpected_http_status_code(response: Response) -> Error {
+        Error::UnexpectedHttpStatusCode(
+            response.status(),
+            response
+                .text()
+                .await
+                .map_err(|e| format!("Failed to get response body as text: {e}"))
+                .and_then(|text| {
+                    serde_json::from_str::<Value>(&text)
+                        .map(|v| v["error"]["message"].to_string())
+                        .map_err(|e| format!("Failed to parse error response: {e}"))
+                })
+                .unwrap(),
+        )
+    }
 }

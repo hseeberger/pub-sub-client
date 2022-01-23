@@ -1,5 +1,5 @@
-use crate::{Error, PubSubClient};
-use reqwest::Response;
+use crate::error::Error;
+use crate::PubSubClient;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -98,11 +98,15 @@ impl PubSubClient {
     ) -> Result<Vec<ReceivedMessage>, Error> {
         let request = PullRequest { max_messages };
         let response = self
-            .send_request(&self.url(subscription_id, "pull"), &request, timeout)
+            .send_request(
+                &self.subscription_url(subscription_id, "pull"),
+                &request,
+                timeout,
+            )
             .await?;
 
         if !response.status().is_success() {
-            return Err(unexpected_http_status_code(response).await);
+            return Err(Error::unexpected_http_status_code(response).await);
         }
 
         let received_messages = response
@@ -123,20 +127,23 @@ impl PubSubClient {
     ) -> Result<(), Error> {
         let request = AcknowledgeRequest { ack_ids };
         let response = self
-            .send_request(&self.url(subscription_id, "acknowledge"), &request, timeout)
+            .send_request(
+                &self.subscription_url(subscription_id, "acknowledge"),
+                &request,
+                timeout,
+            )
             .await?;
 
         if !response.status().is_success() {
-            return Err(unexpected_http_status_code(response).await);
+            return Err(Error::unexpected_http_status_code(response).await);
         }
 
         Ok(())
     }
 
-    fn url(&self, subscription_id: &str, action: &str) -> String {
-        let base_url = &self.base_url;
-        let project_id = &self.project_id;
-        format!("{base_url}/v1/projects/{project_id}/subscriptions/{subscription_id}:{action}")
+    fn subscription_url(&self, subscription_id: &str, action: &str) -> String {
+        let project_url = &self.project_url;
+        format!("{project_url}/subscriptions/{subscription_id}:{action}")
     }
 }
 
@@ -190,22 +197,6 @@ where
                 })
         })
         .collect()
-}
-
-async fn unexpected_http_status_code(response: Response) -> Error {
-    Error::UnexpectedHttpStatusCode(
-        response.status(),
-        response
-            .text()
-            .await
-            .map_err(|e| format!("Failed to get response body as text: {e}"))
-            .and_then(|text| {
-                serde_json::from_str::<Value>(&text)
-                    .map(|v| v["error"]["message"].to_string())
-                    .map_err(|e| format!("Failed to parse error response: {e}"))
-            })
-            .unwrap(),
-    )
 }
 
 #[cfg(test)]
