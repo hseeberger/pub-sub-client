@@ -26,18 +26,18 @@ async fn run() -> Result<(), Error> {
         Duration::from_secs(30),
     )?;
 
-    let envelopes = pub_sub_client
+    let pulled_messages = pub_sub_client
         .pull::<Message>(SUBSCRIPTION, 42, None)
         .await?;
 
-    for envelope in envelopes {
-        let envelope = envelope?;
+    for pulled_message in pulled_messages {
+        let pulled_message = pulled_message?;
 
-        let text = envelope.message.text;
+        let text = pulled_message.message.text;
         println!("Message text: {text}");
 
         pub_sub_client
-            .acknowledge(SUBSCRIPTION, vec![&envelope.ack_id], None)
+            .acknowledge(SUBSCRIPTION, vec![&pulled_message.ack_id], None)
             .await?;
         println!("Successfully acknowledged");
     }

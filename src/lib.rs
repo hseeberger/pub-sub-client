@@ -1,9 +1,10 @@
 mod error;
+mod publisher;
 mod subscriber;
 
 pub use crate::error::*;
+pub use crate::publisher::*;
 pub use crate::subscriber::*;
-
 use goauth::auth::JwtClaims;
 use goauth::credentials::Credentials;
 use goauth::fetcher::TokenFetcher;
@@ -37,7 +38,7 @@ impl PubSubClient {
         let credentials =
             Credentials::from_file(key_path).map_err(|source| Error::Initialization {
                 reason: format!("Missing or malformed service account key at `{key_path}`"),
-                source,
+                source: Box::new(source),
             })?;
 
         let jwt = Jwt::new(
@@ -52,16 +53,17 @@ impl PubSubClient {
                 .rsa_key()
                 .map_err(|source| Error::Initialization {
                     reason: format!("Malformed private key in service account key at `{key_path}`"),
-                    source,
+                    source: Box::new(source),
                 })?,
             None,
         );
 
-        // We do not want time::Duration to unnecessarily be exposed in our API
-        let refresh_buffer = time::Duration::new(
-            refresh_buffer.as_secs() as i64,
-            refresh_buffer.as_nanos() as i32,
-        );
+        let refresh_buffer = refresh_buffer
+            .try_into()
+            .map_err(|source| Error::Initialization {
+                reason: format!("Invalid refresh_buffer `{refresh_buffer:?}`"),
+                source: Box::new(source),
+            })?;
 
         Ok(Self {
             base_url: env::var(BASE_URL_ENV_VAR).unwrap_or_else(|_| DEFAULT_BASE_URL.to_string()),

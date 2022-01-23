@@ -1,5 +1,5 @@
 use anyhow::anyhow;
-use pub_sub_client::{Error, MessageEnvelope, PubSubClient, ReceivedMessage};
+use pub_sub_client::{Error, PubSubClient, PulledMessage, ReceivedMessage};
 use serde::Deserialize;
 use serde_json::{json, Value};
 use std::error::Error as _;
@@ -30,7 +30,7 @@ async fn run() -> Result<(), Error> {
         Duration::from_secs(30),
     )?;
 
-    let msg_envelopes = pub_sub_client
+    let pulled_messages = pub_sub_client
         .pull_with_transform::<Message, _>(
             SUBSCRIPTION,
             42,
@@ -39,14 +39,16 @@ async fn run() -> Result<(), Error> {
         )
         .await?;
 
-    for msg_envelope in msg_envelopes {
-        let MessageEnvelope {
-            id,
+    for pulled_message in pulled_messages {
+        let PulledMessage {
             ack_id,
-            attributes: _,
             message,
+            attributes: _,
+            id,
+            publish_time: _,
+            ordering_key: _,
             delivery_attempt,
-        } = msg_envelope?;
+        } = pulled_message?;
         println!("id: {id}, message: {message:?}, delivery_attempt: {delivery_attempt}");
 
         pub_sub_client
@@ -62,7 +64,7 @@ fn transform(
     received_message: &ReceivedMessage,
     mut value: Value,
 ) -> Result<Value, Box<dyn std::error::Error + Send + Sync + 'static>> {
-    let attributes = &received_message.message.attributes;
+    let attributes = &received_message.pub_sub_message.attributes;
     match attributes.get("version").map(|v| &v[..]).unwrap_or("v1") {
         "v1" => {
             let mut type_keys = attributes

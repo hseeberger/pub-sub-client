@@ -5,7 +5,7 @@ pub enum Error {
     #[error("Initialization error: {reason}")]
     Initialization {
         reason: String,
-        source: goauth::GoErr,
+        source: Box<dyn StdError>,
     },
 
     #[error("Getting authentication token failed")]

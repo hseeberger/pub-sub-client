@@ -1,5 +1,4 @@
 use crate::{Error, PubSubClient};
-
 use reqwest::Response;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
@@ -7,21 +6,25 @@ use serde_json::Value;
 use std::collections::HashMap;
 use std::error::Error as StdError;
 use std::time::Duration;
+use time::OffsetDateTime;
 
 #[derive(Debug)]
-pub struct MessageEnvelope<M: DeserializeOwned> {
-    pub id: String,
+pub struct PulledMessage<M: DeserializeOwned> {
     pub ack_id: String,
-    pub attributes: HashMap<String, String>,
-    pub delivery_attempt: u32,
     pub message: M,
+    pub attributes: HashMap<String, String>,
+    pub id: String,
+    pub publish_time: OffsetDateTime,
+    pub ordering_key: Option<String>,
+    pub delivery_attempt: u32,
 }
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ReceivedMessage {
     pub ack_id: String,
-    pub message: PubSubMessage,
+    #[serde(rename = "message")]
+    pub pub_sub_message: PubSubMessage,
     #[serde(default)] // The Pub/Sub emulator does not send this field!
     pub delivery_attempt: u32,
 }
@@ -29,11 +32,14 @@ pub struct ReceivedMessage {
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PubSubMessage {
+    pub data: String,
+    #[serde(default)]
+    pub attributes: HashMap<String, String>,
     #[serde(rename = "messageId")]
     pub id: String,
-    pub data: String,
-    #[serde(default = "HashMap::default")]
-    pub attributes: HashMap<String, String>,
+    #[serde(with = "time::serde::rfc3339")]
+    pub publish_time: OffsetDateTime,
+    pub ordering_key: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -45,7 +51,7 @@ struct PullRequest {
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct PullResponse {
-    #[serde(default = "Vec::default")]
+    #[serde(default)]
     received_messages: Vec<ReceivedMessage>,
 }
 
@@ -61,7 +67,7 @@ impl PubSubClient {
         subscription_id: &str,
         max_messages: u32,
         timeout: Option<Duration>,
-    ) -> Result<Vec<Result<MessageEnvelope<M>, Error>>, Error> {
+    ) -> Result<Vec<Result<PulledMessage<M>, Error>>, Error> {
         self.pull_with_transform(subscription_id, max_messages, timeout, |_, value| Ok(value))
             .await
     }
@@ -72,7 +78,7 @@ impl PubSubClient {
         max_messages: u32,
         timeout: Option<Duration>,
         transform: T,
-    ) -> Result<Vec<Result<MessageEnvelope<M>, Error>>, Error>
+    ) -> Result<Vec<Result<PulledMessage<M>, Error>>, Error>
     where
         M: DeserializeOwned,
         T: Fn(&ReceivedMessage, Value) -> Result<Value, Box<dyn StdError + Send + Sync + 'static>>,
@@ -99,12 +105,12 @@ impl PubSubClient {
             return Err(unexpected_http_status_code(response).await);
         }
 
-        let pull_response = response
+        let received_messages = response
             .json::<PullResponse>()
             .await
-            .map_err(|source| Error::UnexpectedHttpResponse { source })?;
-
-        Ok(pull_response.received_messages)
+            .map_err(|source| Error::UnexpectedHttpResponse { source })?
+            .received_messages;
+        Ok(received_messages)
     }
 
     /// According to how Google Cloud Pub/Sub works, passing at least one invalid ACK ID fails the
@@ -137,7 +143,7 @@ impl PubSubClient {
 fn deserialize<M, T>(
     received_messages: Vec<ReceivedMessage>,
     transform: T,
-) -> Vec<Result<MessageEnvelope<M>, Error>>
+) -> Vec<Result<PulledMessage<M>, Error>>
 where
     M: DeserializeOwned,
     T: Fn(&ReceivedMessage, Value) -> Result<Value, Box<dyn StdError + Send + Sync + 'static>>,
@@ -145,7 +151,7 @@ where
     received_messages
         .into_iter()
         .map(|received_message| {
-            base64::decode(&received_message.message.data)
+            base64::decode(&received_message.pub_sub_message.data)
                 .map_err(|source| Error::NoBase64 { source })
                 .and_then(|decoded_data| {
                     serde_json::from_slice::<Value>(&decoded_data)
@@ -159,12 +165,28 @@ where
                     serde_json::from_value(transformed_value)
                         .map_err(|source| Error::Deserialize { source })
                 })
-                .map(|message| MessageEnvelope {
-                    id: received_message.message.id,
-                    ack_id: received_message.ack_id,
-                    attributes: received_message.message.attributes,
-                    delivery_attempt: received_message.delivery_attempt,
-                    message,
+                .map(|message| {
+                    let ReceivedMessage {
+                        ack_id,
+                        pub_sub_message:
+                            PubSubMessage {
+                                data: _,
+                                attributes,
+                                id,
+                                publish_time,
+                                ordering_key,
+                            },
+                        delivery_attempt,
+                    } = received_message;
+                    PulledMessage {
+                        ack_id,
+                        message,
+                        attributes,
+                        id,
+                        publish_time,
+                        ordering_key,
+                        delivery_attempt,
+                    }
                 })
         })
         .collect()
@@ -188,12 +210,16 @@ async fn unexpected_http_status_code(response: Response) -> Error {
 
 #[cfg(test)]
 mod tests {
-    use super::{deserialize, Error, MessageEnvelope, PubSubMessage, ReceivedMessage};
+    use super::{deserialize, Error, PubSubMessage, PulledMessage, ReceivedMessage};
     use anyhow::anyhow;
     use serde::Deserialize;
     use serde_json::{json, Value};
     use std::collections::HashMap;
     use std::error::Error as StdError;
+    use time::format_description::well_known::Rfc3339;
+    use time::OffsetDateTime;
+
+    const TIME: &str = "2022-02-20T22:02:20.123456789Z";
 
     #[derive(Debug, Deserialize, PartialEq, Eq)]
     enum Message {
@@ -206,48 +232,52 @@ mod tests {
         let received_messages = vec![
             ReceivedMessage {
                 ack_id: "ack_id".to_string(),
-                message: PubSubMessage {
-                    id: "id".to_string(),
+                pub_sub_message: PubSubMessage {
                     data: base64::encode(json!({"text": "test"}).to_string()),
                     attributes: HashMap::from([("type".to_string(), "Foo".to_string())]),
+                    id: "id".to_string(),
+                    publish_time: OffsetDateTime::parse(TIME, &Rfc3339).unwrap(),
+                    ordering_key: Some("ordering_key".to_string()),
                 },
                 delivery_attempt: 1,
             },
             ReceivedMessage {
                 ack_id: "ack_id".to_string(),
-                message: PubSubMessage {
-                    id: "id".to_string(),
+                pub_sub_message: PubSubMessage {
                     data: base64::encode(json!({"Bar": {"text": "test"}}).to_string()),
                     attributes: HashMap::from([("version".to_string(), "v2".to_string())]),
+                    id: "id".to_string(),
+                    publish_time: OffsetDateTime::parse(TIME, &Rfc3339).unwrap(),
+                    ordering_key: None,
                 },
                 delivery_attempt: 1,
             },
         ];
-        let messages_result: Vec<Result<MessageEnvelope<Message>, Error>> =
+        let pulled_messages_result: Vec<Result<PulledMessage<Message>, Error>> =
             deserialize(received_messages, transform);
-        assert_eq!(messages_result.len(), 2);
+        assert_eq!(pulled_messages_result.len(), 2);
 
-        assert!(messages_result[0].is_ok());
-        let envelope = messages_result[0].as_ref().unwrap();
-        assert_eq!(envelope.id, "id".to_string());
-        assert_eq!(envelope.ack_id, "ack_id".to_string());
+        assert!(pulled_messages_result[0].is_ok());
+        let pulled_message = pulled_messages_result[0].as_ref().unwrap();
+        assert_eq!(pulled_message.id, "id".to_string());
+        assert_eq!(pulled_message.ack_id, "ack_id".to_string());
         assert_eq!(
-            envelope.attributes,
+            pulled_message.attributes,
             HashMap::from([("type".to_string(), "Foo".to_string())])
         );
         assert_eq!(
-            envelope.message,
+            pulled_message.message,
             Message::Foo {
                 text: "test".to_string()
             }
         );
 
-        assert!(messages_result[1].is_ok());
-        let envelope = messages_result[1].as_ref().unwrap();
-        assert_eq!(envelope.id, "id".to_string());
-        assert_eq!(envelope.ack_id, "ack_id".to_string());
+        assert!(pulled_messages_result[1].is_ok());
+        let pulled_message = pulled_messages_result[1].as_ref().unwrap();
+        assert_eq!(pulled_message.id, "id".to_string());
+        assert_eq!(pulled_message.ack_id, "ack_id".to_string());
         assert_eq!(
-            envelope.message,
+            pulled_message.message,
             Message::Bar {
                 text: "test".to_string()
             }
@@ -258,7 +288,7 @@ mod tests {
         received_message: &ReceivedMessage,
         mut value: Value,
     ) -> Result<Value, Box<dyn StdError + Send + Sync + 'static>> {
-        let attributes = &received_message.message.attributes;
+        let attributes = &received_message.pub_sub_message.attributes;
         match attributes.get("version").map(|v| &v[..]).unwrap_or("v1") {
             "v1" => {
                 let mut type_keys = attributes
