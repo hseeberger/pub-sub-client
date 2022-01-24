@@ -40,7 +40,7 @@ async fn run() -> Result<(), Error> {
         .collect::<Vec<_>>();
     let message_ids = pub_sub_client.publish(TOPIC_ID, messages, None).await?;
     let message_ids = message_ids.join(", ");
-    println!("Published `Message`s with IDs: {message_ids}");
+    println!("Published messages with IDs: {message_ids}");
 
     let pulled_messages = pub_sub_client
         .pull::<Message>(SUBSCRIPTION_ID, 42, None)
@@ -48,13 +48,13 @@ async fn run() -> Result<(), Error> {
     for pulled_message in pulled_messages {
         let pulled_message = pulled_message?;
         let text = pulled_message.message.text;
-        println!("Pulled `Message` with text: {text}");
+        println!("Pulled message with text \"{text}\"");
 
         pub_sub_client
             .acknowledge(SUBSCRIPTION_ID, vec![&pulled_message.ack_id], None)
             .await?;
         let id = pulled_message.id;
-        println!("Successfully acknowledged `Message` with ID: {id}");
+        println!("Successfully acknowledged message with ID {id}");
     }
 
     Ok(())

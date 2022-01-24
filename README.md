@@ -55,13 +55,13 @@ Finally we handle the pulled messages; for simplicity we only deal with the happ
 for pulled_message in pulled_messages {
     let pulled_message = pulled_message?;
     let text = pulled_message.message.text;
-    println!("Pulled `Message` with text: {text}");
+    println!("Pulled `Message` with text `{text}`");
 
     pub_sub_client
         .acknowledge(SUBSCRIPTION_ID, vec![&pulled_message.ack_id], None)
         .await?;
     let id = pulled_message.id;
-    println!("Successfully acknowledged `Message` with ID: {id}");
+    println!("Successfully acknowledged `Message` with ID `{id}`");
 }
 ```
 
