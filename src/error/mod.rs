@@ -23,6 +23,8 @@ pub enum Error {
 
     #[error("Decoding data of received message as Base64 failed")]
     NoBase64 { source: base64::DecodeError },
+    #[error("PubSubMessage contains no data")]
+    NoData,
     #[error("Deserializing data of received message failed")]
     Deserialize { source: serde_json::Error },
     #[error("Serializing of message to be published failed")]

@@ -5,8 +5,10 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
 use std::error::Error as StdError;
+use std::fmt::Debug;
 use std::time::Duration;
 use time::OffsetDateTime;
+use tracing::debug;
 
 #[derive(Debug)]
 pub struct PulledMessage<M: DeserializeOwned> {
@@ -32,7 +34,7 @@ pub struct ReceivedMessage {
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PubSubMessage {
-    pub data: String,
+    pub data: Option<String>,
     #[serde(default)]
     pub attributes: HashMap<String, String>,
     #[serde(rename = "messageId")]
@@ -62,7 +64,8 @@ struct AcknowledgeRequest<'a> {
 }
 
 impl PubSubClient {
-    pub async fn pull<M: DeserializeOwned>(
+    #[tracing::instrument]
+    pub async fn pull<M: DeserializeOwned + Debug>(
         &self,
         subscription_id: &str,
         max_messages: u32,
@@ -72,6 +75,7 @@ impl PubSubClient {
             .await
     }
 
+    #[tracing::instrument(skip(transform))]
     pub async fn pull_with_transform<M, T>(
         &self,
         subscription_id: &str,
@@ -80,7 +84,7 @@ impl PubSubClient {
         transform: T,
     ) -> Result<Vec<Result<PulledMessage<M>, Error>>, Error>
     where
-        M: DeserializeOwned,
+        M: DeserializeOwned + Debug,
         T: Fn(&ReceivedMessage, Value) -> Result<Value, Box<dyn StdError + Send + Sync + 'static>>,
     {
         let received_messages = self
@@ -90,20 +94,17 @@ impl PubSubClient {
         Ok(messages)
     }
 
+    #[tracing::instrument]
     pub async fn pull_raw(
         &self,
         subscription_id: &str,
         max_messages: u32,
         timeout: Option<Duration>,
     ) -> Result<Vec<ReceivedMessage>, Error> {
+        let url = self.subscription_url(subscription_id, "pull");
         let request = PullRequest { max_messages };
-        let response = self
-            .send_request(
-                &self.subscription_url(subscription_id, "pull"),
-                &request,
-                timeout,
-            )
-            .await?;
+        debug!(message = "Sending request", url = display(&url));
+        let response = self.send_request(&url, &request, timeout).await?;
 
         if !response.status().is_success() {
             return Err(Error::unexpected_http_status_code(response).await);
@@ -158,8 +159,12 @@ where
     received_messages
         .into_iter()
         .map(|received_message| {
-            base64::decode(&received_message.pub_sub_message.data)
-                .map_err(|source| Error::NoBase64 { source })
+            received_message
+                .pub_sub_message
+                .data
+                .as_ref()
+                .ok_or_else(|| Error::NoData)
+                .and_then(|data| base64::decode(data).map_err(|source| Error::NoBase64 { source }))
                 .and_then(|decoded_data| {
                     serde_json::from_slice::<Value>(&decoded_data)
                         .map_err(|source| Error::Deserialize { source })
@@ -224,7 +229,7 @@ mod tests {
             ReceivedMessage {
                 ack_id: "ack_id".to_string(),
                 pub_sub_message: PubSubMessage {
-                    data: base64::encode(json!({"text": "test"}).to_string()),
+                    data: Some(base64::encode(json!({"text": "test"}).to_string())),
                     attributes: HashMap::from([("type".to_string(), "Foo".to_string())]),
                     id: "id".to_string(),
                     publish_time: OffsetDateTime::parse(TIME, &Rfc3339).unwrap(),
@@ -235,7 +240,7 @@ mod tests {
             ReceivedMessage {
                 ack_id: "ack_id".to_string(),
                 pub_sub_message: PubSubMessage {
-                    data: base64::encode(json!({"Bar": {"text": "test"}}).to_string()),
+                    data: Some(base64::encode(json!({"Bar": {"text": "test"}}).to_string())),
                     attributes: HashMap::from([("version".to_string(), "v2".to_string())]),
                     id: "id".to_string(),
                     publish_time: OffsetDateTime::parse(TIME, &Rfc3339).unwrap(),

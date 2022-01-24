@@ -3,6 +3,7 @@ use pub_sub_client::PubSubClient;
 use reqwest::{Client, StatusCode};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
+use std::collections::HashMap;
 use std::time::Duration;
 use std::{env, vec};
 use testcontainers::clients::Cli;
@@ -65,7 +66,7 @@ async fn test() {
 
     // Publish raw
     let foo = base64::encode(json!({ "Foo": { "text": TEXT } }).to_string());
-    let messages = vec![PubSubMessage::new(foo)];
+    let messages = vec![PubSubMessage::from_data(foo)];
     let result = pub_sub_client
         .publish_raw(TOPIC_ID, messages, Some(Duration::from_secs(10)))
         .await;
@@ -116,6 +117,7 @@ async fn test() {
     );
 
     assert!(result[2].is_ok());
+    let ack_id_3 = &result[2].as_ref().unwrap().ack_id[..];
     let message_id_3 = &result[2].as_ref().unwrap().id[..];
     assert_eq!(
         result[2].as_ref().unwrap().message,
@@ -149,4 +151,36 @@ async fn test() {
         )
         .await;
     assert!(response.is_err());
+
+    // Acknowledge missing message
+    let ack_ids = vec![ack_id_3];
+    let result = pub_sub_client
+        .acknowledge(SUBSCRIPTION_ID, ack_ids, Some(Duration::from_secs(10)))
+        .await;
+    assert!(result.is_ok());
+
+    // Publish raw, only attributes
+    let messages = vec![PubSubMessage::from_attributes(HashMap::from([(
+        "foo".to_string(),
+        "bar".to_string(),
+    )]))];
+    let result = pub_sub_client
+        .publish_raw(TOPIC_ID, messages, Some(Duration::from_secs(10)))
+        .await;
+    assert!(result.is_ok());
+    let result = result.unwrap();
+    assert_eq!(result.len(), 1);
+
+    // Pull again, raw
+    let result = pub_sub_client
+        .pull_raw(SUBSCRIPTION_ID, 42, Some(Duration::from_secs(45)))
+        .await;
+    assert!(result.is_ok());
+    let result = result.unwrap();
+    assert_eq!(result.len(), 1);
+    assert!(result[0].pub_sub_message.data.is_none());
+    assert_eq!(
+        result[0].pub_sub_message.attributes,
+        HashMap::from([("foo".to_string(), "bar".to_string(),)])
+    );
 }

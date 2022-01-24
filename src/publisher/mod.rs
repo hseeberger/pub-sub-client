@@ -2,21 +2,31 @@ use crate::error::Error;
 use crate::PubSubClient;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::fmt::Debug;
 use std::time::Duration;
+use tracing::debug;
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PubSubMessage {
-    pub data: String,
+    pub data: Option<String>,
     pub attributes: HashMap<String, String>,
     pub ordering_key: Option<String>,
 }
 
 impl PubSubMessage {
-    pub fn new(data: String) -> Self {
+    pub fn from_data(data: String) -> Self {
         Self {
-            data,
+            data: Some(data),
             attributes: HashMap::new(),
+            ordering_key: None,
+        }
+    }
+
+    pub fn from_attributes(attributes: HashMap<String, String>) -> Self {
+        Self {
+            data: None,
+            attributes,
             ordering_key: None,
         }
     }
@@ -35,7 +45,8 @@ struct PublishResponse {
 }
 
 impl PubSubClient {
-    pub async fn publish<M: Serialize>(
+    #[tracing::instrument]
+    pub async fn publish<M: Serialize + Debug>(
         &self,
         topic_id: &str,
         messages: Vec<M>,
@@ -48,7 +59,7 @@ impl PubSubClient {
             .map_err(|source| Error::Serialize { source })?
             .iter()
             .map(|bytes| PubSubMessage {
-                data: base64::encode(bytes),
+                data: Some(base64::encode(bytes)),
                 attributes: HashMap::new(),
                 ordering_key: None,
             })
@@ -57,16 +68,17 @@ impl PubSubClient {
         self.publish_raw(topic_id, messages, timeout).await
     }
 
+    #[tracing::instrument]
     pub async fn publish_raw(
         &self,
         topic_id: &str,
         messages: Vec<PubSubMessage>,
         timeout: Option<Duration>,
     ) -> Result<Vec<String>, Error> {
+        let url = self.topic_url(topic_id);
         let request = PublishRequest { messages };
-        let response = self
-            .send_request(&self.topic_url(topic_id), &request, timeout)
-            .await?;
+        debug!(message = "Sending request", url = display(&url));
+        let response = self.send_request(&url, &request, timeout).await?;
 
         if !response.status().is_success() {
             return Err(Error::unexpected_http_status_code(response).await);
@@ -77,6 +89,10 @@ impl PubSubClient {
             .await
             .map_err(|source| Error::UnexpectedHttpResponse { source })?
             .message_ids;
+        debug!(
+            message = "Request was successful",
+            message_ids = debug(&message_ids)
+        );
         Ok(message_ids)
     }
 
