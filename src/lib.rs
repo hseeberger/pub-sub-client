@@ -35,7 +35,7 @@ impl PubSubClient {
         let credentials =
             Credentials::from_file(key_path).map_err(|source| Error::Initialization {
                 reason: format!("Missing or malformed service account key at `{key_path}`"),
-                source: Box::new(source),
+                source: source.into(),
             })?;
 
         let base_url = env::var(BASE_URL_ENV_VAR).unwrap_or_else(|_| DEFAULT_BASE_URL.to_string());
@@ -54,7 +54,7 @@ impl PubSubClient {
                 .rsa_key()
                 .map_err(|source| Error::Initialization {
                     reason: format!("Malformed private key in service account key at `{key_path}`"),
-                    source: Box::new(source),
+                    source: source.into(),
                 })?,
             None,
         );
