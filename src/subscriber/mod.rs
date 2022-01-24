@@ -163,7 +163,7 @@ where
                 .pub_sub_message
                 .data
                 .as_ref()
-                .ok_or_else(|| Error::NoData)
+                .ok_or(Error::NoData)
                 .and_then(|data| base64::decode(data).map_err(|source| Error::NoBase64 { source }))
                 .and_then(|decoded_data| {
                     serde_json::from_slice::<Value>(&decoded_data)
