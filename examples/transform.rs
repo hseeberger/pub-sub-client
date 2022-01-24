@@ -52,7 +52,7 @@ async fn run() -> Result<(), Error> {
         .collect::<Vec<_>>();
     let message_ids = pub_sub_client.publish_raw(TOPIC_ID, messages, None).await?;
     let message_ids = message_ids.join(", ");
-    println!("Published `Message`s with IDs: {message_ids}");
+    println!("Published messages with IDs: {message_ids}");
 
     let pulled_messages = pub_sub_client
         .pull_with_transform::<Message, _>(
@@ -73,7 +73,9 @@ async fn run() -> Result<(), Error> {
             ordering_key: _,
             delivery_attempt,
         } = pulled_message?;
-        println!("id: {id}, message: {message:?}, delivery_attempt: {delivery_attempt}");
+        println!(
+            "Pulled message `{message:?}` with ID {id} and {delivery_attempt}. delivery attempt"
+        );
 
         pub_sub_client
             .acknowledge(
@@ -82,7 +84,7 @@ async fn run() -> Result<(), Error> {
                 Some(Duration::from_secs(10)),
             )
             .await?;
-        println!("Successfully acknowledged");
+        println!("Successfully acknowledged message with ID {id}");
     }
 
     Ok(())
