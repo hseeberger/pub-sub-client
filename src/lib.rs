@@ -1,9 +1,8 @@
-mod error;
-mod subscriber;
+pub mod error;
+pub mod publisher;
+pub mod subscriber;
 
-pub use crate::error::*;
-pub use crate::subscriber::*;
-
+use crate::error::Error;
 use goauth::auth::JwtClaims;
 use goauth::credentials::Credentials;
 use goauth::fetcher::TokenFetcher;
@@ -18,8 +17,7 @@ const BASE_URL_ENV_VAR: &str = "PUB_SUB_BASE_URL";
 const DEFAULT_BASE_URL: &str = "https://pubsub.googleapis.com";
 
 pub struct PubSubClient {
-    base_url: String,
-    project_id: String,
+    project_url: String,
     token_fetcher: TokenFetcher,
     reqwest_client: reqwest::Client,
 }
@@ -27,7 +25,7 @@ pub struct PubSubClient {
 impl std::fmt::Debug for PubSubClient {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("PubSubClient")
-            .field("base_url", &self.base_url)
+            .field("project_url", &self.project_url)
             .finish()
     }
 }
@@ -37,8 +35,12 @@ impl PubSubClient {
         let credentials =
             Credentials::from_file(key_path).map_err(|source| Error::Initialization {
                 reason: format!("Missing or malformed service account key at `{key_path}`"),
-                source,
+                source: source.into(),
             })?;
+
+        let base_url = env::var(BASE_URL_ENV_VAR).unwrap_or_else(|_| DEFAULT_BASE_URL.to_string());
+        let project_id = credentials.project();
+        let project_url = format!("{base_url}/v1/projects/{project_id}");
 
         let jwt = Jwt::new(
             JwtClaims::new(
@@ -52,20 +54,20 @@ impl PubSubClient {
                 .rsa_key()
                 .map_err(|source| Error::Initialization {
                     reason: format!("Malformed private key in service account key at `{key_path}`"),
-                    source,
+                    source: source.into(),
                 })?,
             None,
         );
 
-        // We do not want time::Duration to unnecessarily be exposed in our API
-        let refresh_buffer = time::Duration::new(
-            refresh_buffer.as_secs() as i64,
-            refresh_buffer.as_nanos() as i32,
-        );
+        let refresh_buffer = refresh_buffer
+            .try_into()
+            .map_err(|source| Error::Initialization {
+                reason: format!("Invalid refresh_buffer `{refresh_buffer:?}`"),
+                source: Box::new(source),
+            })?;
 
         Ok(Self {
-            base_url: env::var(BASE_URL_ENV_VAR).unwrap_or_else(|_| DEFAULT_BASE_URL.to_string()),
-            project_id: credentials.project(),
+            project_url,
             token_fetcher: TokenFetcher::new(jwt, credentials, refresh_buffer),
             reqwest_client: reqwest::Client::new(),
         })

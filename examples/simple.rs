@@ -1,17 +1,24 @@
-use pub_sub_client::{Error, PubSubClient};
-use serde::Deserialize;
+use pub_sub_client::error::Error;
+use pub_sub_client::PubSubClient;
+use serde::{Deserialize, Serialize};
 use std::error::Error as _;
 use std::time::Duration;
 
-const SUBSCRIPTION: &str = "test";
+const TOPIC_ID: &str = "test";
+const SUBSCRIPTION_ID: &str = "test";
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 struct Message {
     text: String,
 }
 
 #[tokio::main]
 async fn main() {
+    tracing_subscriber::fmt()
+        .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
+        .json()
+        .init();
+
     if let Err(e) = run().await {
         eprintln!("ERROR: {e}");
         if let Some(e) = e.source() {
@@ -26,20 +33,28 @@ async fn run() -> Result<(), Error> {
         Duration::from_secs(30),
     )?;
 
-    let envelopes = pub_sub_client
-        .pull::<Message>(SUBSCRIPTION, 42, None)
+    let messages = vec!["Hello", "from pub-sub-client"]
+        .iter()
+        .map(|s| s.to_string())
+        .map(|text| Message { text })
+        .collect::<Vec<_>>();
+    let message_ids = pub_sub_client.publish(TOPIC_ID, messages, None).await?;
+    let message_ids = message_ids.join(", ");
+    println!("Published `Message`s with IDs: {message_ids}");
+
+    let pulled_messages = pub_sub_client
+        .pull::<Message>(SUBSCRIPTION_ID, 42, None)
         .await?;
-
-    for envelope in envelopes {
-        let envelope = envelope?;
-
-        let text = envelope.message.text;
-        println!("Message text: {text}");
+    for pulled_message in pulled_messages {
+        let pulled_message = pulled_message?;
+        let text = pulled_message.message.text;
+        println!("Pulled `Message` with text: {text}");
 
         pub_sub_client
-            .acknowledge(SUBSCRIPTION, vec![&envelope.ack_id], None)
+            .acknowledge(SUBSCRIPTION_ID, vec![&pulled_message.ack_id], None)
             .await?;
-        println!("Successfully acknowledged");
+        let id = pulled_message.id;
+        println!("Successfully acknowledged `Message` with ID: {id}");
     }
 
     Ok(())
