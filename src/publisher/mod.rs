@@ -6,7 +6,7 @@ use std::fmt::Debug;
 use std::time::Duration;
 use tracing::debug;
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Default, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PubSubMessage {
     pub data: Option<String>,
@@ -15,19 +15,21 @@ pub struct PubSubMessage {
 }
 
 impl PubSubMessage {
-    pub fn from_data(data: String) -> Self {
+    pub fn with_data(self, data: String) -> Self {
         Self {
             data: Some(data),
-            attributes: HashMap::new(),
-            ordering_key: None,
+            ..self
         }
     }
 
-    pub fn from_attributes(attributes: HashMap<String, String>) -> Self {
+    pub fn with_attributes(self, attributes: HashMap<String, String>) -> Self {
+        Self { attributes, ..self }
+    }
+
+    pub fn with_ordering_key(self, ordering_key: String) -> Self {
         Self {
-            data: None,
-            attributes,
-            ordering_key: None,
+            ordering_key: Some(ordering_key),
+            ..self
         }
     }
 }

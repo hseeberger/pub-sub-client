@@ -66,7 +66,7 @@ async fn test() {
 
     // Publish raw
     let foo = base64::encode(json!({ "Foo": { "text": TEXT } }).to_string());
-    let messages = vec![PubSubMessage::from_data(foo)];
+    let messages = vec![PubSubMessage::default().with_data(foo)];
     let result = pub_sub_client
         .publish_raw(TOPIC_ID, messages, Some(Duration::from_secs(10)))
         .await;
@@ -160,10 +160,8 @@ async fn test() {
     assert!(result.is_ok());
 
     // Publish raw, only attributes
-    let messages = vec![PubSubMessage::from_attributes(HashMap::from([(
-        "foo".to_string(),
-        "bar".to_string(),
-    )]))];
+    let messages = vec![PubSubMessage::default()
+        .with_attributes(HashMap::from([("foo".to_string(), "bar".to_string())]))];
     let result = pub_sub_client
         .publish_raw(TOPIC_ID, messages, Some(Duration::from_secs(10)))
         .await;
