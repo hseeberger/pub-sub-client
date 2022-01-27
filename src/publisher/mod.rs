@@ -8,36 +8,41 @@ use tracing::debug;
 
 #[derive(Debug, Default, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct PubSubMessage {
+pub struct PubSubMessage<'a> {
     pub data: Option<String>,
-    pub attributes: HashMap<String, String>,
-    pub ordering_key: Option<String>,
+    pub attributes: Option<&'a HashMap<String, String>>,
+    pub ordering_key: Option<&'a str>,
 }
 
-impl PubSubMessage {
-    pub fn with_data(self, data: String) -> Self {
+impl<'a> PubSubMessage<'a> {
+    pub fn new(data: String) -> Self {
         Self {
             data: Some(data),
-            ..self
+            attributes: None,
+            ordering_key: None,
         }
     }
 
-    pub fn with_attributes(self, attributes: HashMap<String, String>) -> Self {
-        Self { attributes, ..self }
+    pub fn with_data(mut self, data: String) -> Self {
+        self.data = Some(data);
+        self
     }
 
-    pub fn with_ordering_key(self, ordering_key: String) -> Self {
-        Self {
-            ordering_key: Some(ordering_key),
-            ..self
-        }
+    pub fn with_attributes(mut self, attributes: &'a HashMap<String, String>) -> Self {
+        self.attributes = Some(attributes);
+        self
+    }
+
+    pub fn with_ordering_key(mut self, ordering_key: &'a str) -> Self {
+        self.ordering_key = Some(ordering_key);
+        self
     }
 }
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
-struct PublishRequest {
-    messages: Vec<PubSubMessage>,
+struct PublishRequest<'a> {
+    messages: Vec<PubSubMessage<'a>>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -48,22 +53,26 @@ struct PublishResponse {
 
 impl PubSubClient {
     #[tracing::instrument]
-    pub async fn publish<M: Serialize + Debug>(
+    pub async fn publish<'a, M: Serialize + Debug>(
         &self,
         topic_id: &str,
         messages: Vec<M>,
+        attributes: Option<&'a HashMap<String, String>>,
+        ordering_key: Option<&'a str>,
         timeout: Option<Duration>,
     ) -> Result<Vec<String>, Error> {
-        // Turn collection of results into reult of collection, failing fast;
-        // see https://doc.rust-lang.org/std/result/enum.Result.html#impl-FromIterator%3CResult%3CA%2C%20E%3E%3E
-        let messages: Result<Vec<_>, _> = messages.iter().map(|m| serde_json::to_vec(m)).collect();
-        let messages = messages
+        let bytes = messages
+            .iter()
+            .map(|m| serde_json::to_vec(m))
+            .collect::<Result<Vec<_>, _>>();
+
+        let messages = bytes
             .map_err(|source| Error::Serialize { source })?
             .iter()
             .map(|bytes| PubSubMessage {
                 data: Some(base64::encode(bytes)),
-                attributes: HashMap::new(),
-                ordering_key: None,
+                attributes: attributes,
+                ordering_key: ordering_key,
             })
             .collect::<Vec<_>>();
 
@@ -71,10 +80,10 @@ impl PubSubClient {
     }
 
     #[tracing::instrument]
-    pub async fn publish_raw(
+    pub async fn publish_raw<'a>(
         &self,
         topic_id: &str,
-        messages: Vec<PubSubMessage>,
+        messages: Vec<PubSubMessage<'a>>,
         timeout: Option<Duration>,
     ) -> Result<Vec<String>, Error> {
         let url = self.topic_url(topic_id);

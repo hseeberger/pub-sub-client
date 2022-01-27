@@ -66,7 +66,7 @@ async fn test() {
 
     // Publish raw
     let foo = base64::encode(json!({ "Foo": { "text": TEXT } }).to_string());
-    let messages = vec![PubSubMessage::default().with_data(foo)];
+    let messages = vec![PubSubMessage::new(foo)];
     let result = pub_sub_client
         .publish_raw(TOPIC_ID, messages, Some(Duration::from_secs(10)))
         .await;
@@ -84,7 +84,13 @@ async fn test() {
         },
     ];
     let result = pub_sub_client
-        .publish(TOPIC_ID, messages, Some(Duration::from_secs(10)))
+        .publish(
+            TOPIC_ID,
+            messages,
+            None,
+            None,
+            Some(Duration::from_secs(10)),
+        )
         .await;
     assert!(result.is_ok());
     let result = result.unwrap();
@@ -160,8 +166,8 @@ async fn test() {
     assert!(result.is_ok());
 
     // Publish raw, only attributes
-    let messages = vec![PubSubMessage::default()
-        .with_attributes(HashMap::from([("foo".to_string(), "bar".to_string())]))];
+    let attributes = HashMap::from([("foo".to_string(), "bar".to_string())]);
+    let messages = vec![PubSubMessage::default().with_attributes(&attributes)];
     let result = pub_sub_client
         .publish_raw(TOPIC_ID, messages, Some(Duration::from_secs(10)))
         .await;
