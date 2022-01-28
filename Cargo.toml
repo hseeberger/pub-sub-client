@@ -1,2 +1,2 @@
 [workspace]
-members = [ "pub-sub-client", "pub-sub-client-derive" ]
+members = [ "pub-sub-client", "pub-sub-client-derive", "pub-sub-client-tests" ]

@@ -6,14 +6,14 @@ use std::fmt::Debug;
 use std::time::Duration;
 use tracing::debug;
 
-pub trait Message: Serialize {}
+pub trait PublisherMessage: Serialize {}
 
-pub struct MessageEnvelope<M: Message> {
+pub struct MessageEnvelope<M: PublisherMessage> {
     message: M,
     attributes: Option<HashMap<String, String>>,
 }
 
-impl<M: Message> From<M> for MessageEnvelope<M> {
+impl<M: PublisherMessage> From<M> for MessageEnvelope<M> {
     fn from(message: M) -> Self {
         Self {
             message,
@@ -22,7 +22,7 @@ impl<M: Message> From<M> for MessageEnvelope<M> {
     }
 }
 
-impl<M: Message> From<(M, HashMap<String, String>)> for MessageEnvelope<M> {
+impl<M: PublisherMessage> From<(M, HashMap<String, String>)> for MessageEnvelope<M> {
     fn from((message, attributes): (M, HashMap<String, String>)) -> Self {
         Self {
             message,
@@ -78,7 +78,7 @@ struct PublishResponse {
 
 impl PubSubClient {
     #[tracing::instrument]
-    pub async fn publish<'a, M: Message, E: Into<MessageEnvelope<M>> + Debug>(
+    pub async fn publish<'a, M: PublisherMessage, E: Into<MessageEnvelope<M>> + Debug>(
         &self,
         topic_id: &str,
         envelopes: Vec<E>,

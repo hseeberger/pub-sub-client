@@ -1,7 +1,7 @@
 use anyhow::anyhow;
 use pub_sub_client::error::Error;
-use pub_sub_client::publisher::Message as PublisherMessage;
 use pub_sub_client::publisher::PubSubMessage;
+use pub_sub_client::publisher::PublisherMessage;
 use pub_sub_client::subscriber::{PulledMessage, ReceivedMessage};
 use pub_sub_client::PubSubClient;
 use serde::{Deserialize, Serialize};

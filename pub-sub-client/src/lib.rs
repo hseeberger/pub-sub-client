@@ -2,6 +2,9 @@ pub mod error;
 pub mod publisher;
 pub mod subscriber;
 
+#[cfg(feature = "derive")]
+pub use pub_sub_client_derive::*;
+
 use crate::error::Error;
 use goauth::auth::JwtClaims;
 use goauth::credentials::Credentials;

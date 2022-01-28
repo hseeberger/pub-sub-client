@@ -1,5 +1,5 @@
 use pub_sub_client::error::Error;
-use pub_sub_client::publisher::Message as PublisherMessage;
+use pub_sub_client::publisher::PublisherMessage;
 use pub_sub_client::PubSubClient;
 use serde::{Deserialize, Serialize};
 use std::error::Error as _;

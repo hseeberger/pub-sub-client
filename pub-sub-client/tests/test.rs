@@ -1,6 +1,7 @@
-use pub_sub_client::publisher::Message as PublisherMessage;
 use pub_sub_client::publisher::PubSubMessage;
+use pub_sub_client::publisher::PublisherMessage;
 use pub_sub_client::PubSubClient;
+use pub_sub_client_derive::PublisherMessage;
 use reqwest::{Client, StatusCode};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -15,13 +16,11 @@ const TOPIC_ID: &str = "test-topic";
 const SUBSCRIPTION_ID: &str = "test-subscription";
 const TEXT: &str = "test-text";
 
-#[derive(Debug, Deserialize, Serialize, PartialEq)]
+#[derive(Debug, Deserialize, Serialize, PublisherMessage, PartialEq)]
 enum Message {
     Foo { text: String },
     Bar { text: String },
 }
-
-impl PublisherMessage for Message {}
 
 #[tokio::test]
 async fn test() {
