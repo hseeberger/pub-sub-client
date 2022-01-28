@@ -1,0 +1,15 @@
+[package]
+name = "pub-sub-client-derive"
+version = "0.8.0"
+edition = "2021"
+rust-version = "1.58"
+
+description = "Macros for pub-sub-client"
+authors = [ "Heiko Seeberger <mail@heikoseeberger.rocks>" ]
+license-file = "LICENSE"
+readme = "README.md"
+homepage = "https://github.com/hseeberger/pub-sub-client"
+repository = "https://github.com/hseeberger/pub-sub-client"
+documentation = "https://github.com/hseeberger/pub-sub-client"
+
+[dependencies]
