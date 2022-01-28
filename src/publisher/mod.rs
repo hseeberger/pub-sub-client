@@ -6,11 +6,36 @@ use std::fmt::Debug;
 use std::time::Duration;
 use tracing::debug;
 
+pub trait Message: Serialize {}
+
+pub struct MessageEnvelope<M: Message> {
+    message: M,
+    attributes: Option<HashMap<String, String>>,
+}
+
+impl<M: Message> From<M> for MessageEnvelope<M> {
+    fn from(message: M) -> Self {
+        Self {
+            message,
+            attributes: None,
+        }
+    }
+}
+
+impl<M: Message> From<(M, HashMap<String, String>)> for MessageEnvelope<M> {
+    fn from((message, attributes): (M, HashMap<String, String>)) -> Self {
+        Self {
+            message,
+            attributes: Some(attributes),
+        }
+    }
+}
+
 #[derive(Debug, Default, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PubSubMessage<'a> {
     pub data: Option<String>,
-    pub attributes: Option<&'a HashMap<String, String>>,
+    pub attributes: Option<HashMap<String, String>>,
     pub ordering_key: Option<&'a str>,
 }
 
@@ -28,7 +53,7 @@ impl<'a> PubSubMessage<'a> {
         self
     }
 
-    pub fn with_attributes(mut self, attributes: &'a HashMap<String, String>) -> Self {
+    pub fn with_attributes(mut self, attributes: HashMap<String, String>) -> Self {
         self.attributes = Some(attributes);
         self
     }
@@ -53,23 +78,28 @@ struct PublishResponse {
 
 impl PubSubClient {
     #[tracing::instrument]
-    pub async fn publish<'a, M: Serialize + Debug>(
+    pub async fn publish<'a, M: Message, E: Into<MessageEnvelope<M>> + Debug>(
         &self,
         topic_id: &str,
-        messages: Vec<M>,
-        attributes: Option<&'a HashMap<String, String>>,
+        envelopes: Vec<E>,
         ordering_key: Option<&'a str>,
         timeout: Option<Duration>,
     ) -> Result<Vec<String>, Error> {
-        let bytes = messages
-            .iter()
-            .map(|m| serde_json::to_vec(m))
+        let bytes = envelopes
+            .into_iter()
+            .map(|envelope| {
+                let MessageEnvelope {
+                    message,
+                    attributes,
+                } = envelope.into();
+                serde_json::to_vec(&message).map(|bytes| (bytes, attributes))
+            })
             .collect::<Result<Vec<_>, _>>();
 
         let messages = bytes
             .map_err(|source| Error::Serialize { source })?
-            .iter()
-            .map(|bytes| PubSubMessage {
+            .into_iter()
+            .map(|(bytes, attributes)| PubSubMessage {
                 data: Some(base64::encode(bytes)),
                 attributes: attributes,
                 ordering_key: ordering_key,

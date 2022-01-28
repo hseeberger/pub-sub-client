@@ -1,4 +1,5 @@
 use pub_sub_client::error::Error;
+use pub_sub_client::publisher::Message as PublisherMessage;
 use pub_sub_client::PubSubClient;
 use serde::{Deserialize, Serialize};
 use std::error::Error as _;
@@ -11,6 +12,8 @@ const SUBSCRIPTION_ID: &str = "test";
 struct Message {
     text: String,
 }
+
+impl PublisherMessage for Message {}
 
 #[tokio::main]
 async fn main() {
@@ -39,7 +42,7 @@ async fn run() -> Result<(), Error> {
         .map(|text| Message { text })
         .collect::<Vec<_>>();
     let message_ids = pub_sub_client
-        .publish(TOPIC_ID, messages, None, None, None)
+        .publish(TOPIC_ID, messages, None, None)
         .await?;
     let message_ids = message_ids.join(", ");
     println!("Published messages with IDs: {message_ids}");

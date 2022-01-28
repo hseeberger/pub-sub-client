@@ -1,3 +1,4 @@
+use pub_sub_client::publisher::Message as PublisherMessage;
 use pub_sub_client::publisher::PubSubMessage;
 use pub_sub_client::PubSubClient;
 use reqwest::{Client, StatusCode};
@@ -14,11 +15,13 @@ const TOPIC_ID: &str = "test-topic";
 const SUBSCRIPTION_ID: &str = "test-subscription";
 const TEXT: &str = "test-text";
 
-#[derive(Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[derive(Debug, Deserialize, Serialize, PartialEq)]
 enum Message {
     Foo { text: String },
     Bar { text: String },
 }
+
+impl PublisherMessage for Message {}
 
 #[tokio::test]
 async fn test() {
@@ -84,13 +87,7 @@ async fn test() {
         },
     ];
     let result = pub_sub_client
-        .publish(
-            TOPIC_ID,
-            messages,
-            None,
-            None,
-            Some(Duration::from_secs(10)),
-        )
+        .publish(TOPIC_ID, messages, None, Some(Duration::from_secs(10)))
         .await;
     assert!(result.is_ok());
     let result = result.unwrap();
@@ -167,7 +164,7 @@ async fn test() {
 
     // Publish raw, only attributes
     let attributes = HashMap::from([("foo".to_string(), "bar".to_string())]);
-    let messages = vec![PubSubMessage::default().with_attributes(&attributes)];
+    let messages = vec![PubSubMessage::default().with_attributes(attributes)];
     let result = pub_sub_client
         .publish_raw(TOPIC_ID, messages, Some(Duration::from_secs(10)))
         .await;
@@ -186,5 +183,47 @@ async fn test() {
     assert_eq!(
         result[0].pub_sub_message.attributes,
         HashMap::from([("foo".to_string(), "bar".to_string(),)])
+    );
+
+    // Acknowledge
+    let ack_ids = vec![&result[0].ack_id[..]];
+    let result = pub_sub_client
+        .acknowledge(SUBSCRIPTION_ID, ack_ids, Some(Duration::from_secs(10)))
+        .await;
+    assert!(result.is_ok());
+
+    // Publish typed with attributes
+    let messages = vec![(
+        Message::Foo {
+            text: TEXT.to_string(),
+        },
+        HashMap::from([("version".to_string(), "v1".to_string())]),
+    )];
+    let result = pub_sub_client
+        .publish(TOPIC_ID, messages, None, Some(Duration::from_secs(10)))
+        .await;
+    assert!(result.is_ok());
+    let result = result.unwrap();
+    assert_eq!(result.len(), 1);
+
+    // Pull typed
+    let result = pub_sub_client
+        .pull::<Message>(SUBSCRIPTION_ID, 42, Some(Duration::from_secs(45)))
+        .await;
+    assert!(result.is_ok());
+    let result = result.unwrap();
+    assert_eq!(result.len(), 1);
+
+    eprintln!("{:?}", result[0]);
+    assert!(result[0].is_ok());
+    assert_eq!(
+        result[0].as_ref().unwrap().message,
+        Message::Foo {
+            text: TEXT.to_string()
+        }
+    );
+    assert_eq!(
+        result[0].as_ref().unwrap().attributes,
+        HashMap::from([("version".to_string(), "v1".to_string())])
     );
 }

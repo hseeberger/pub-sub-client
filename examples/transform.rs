@@ -1,5 +1,6 @@
 use anyhow::anyhow;
 use pub_sub_client::error::Error;
+use pub_sub_client::publisher::Message as PublisherMessage;
 use pub_sub_client::publisher::PubSubMessage;
 use pub_sub_client::subscriber::{PulledMessage, ReceivedMessage};
 use pub_sub_client::PubSubClient;
@@ -19,6 +20,8 @@ enum Message {
     Foo { text: String },
     Bar { text: String },
 }
+
+impl PublisherMessage for Message {}
 
 #[tokio::main]
 async fn main() {
@@ -41,11 +44,13 @@ async fn run() -> Result<(), Error> {
         Duration::from_secs(30),
     )?;
 
-    let attributes = HashMap::from([("type".to_string(), "Foo".to_string())]);
     let messages = vec!["Hello", "from pub-sub-client"]
         .iter()
         .map(|s| base64::encode(json!({ "text": s }).to_string()))
-        .map(|data| PubSubMessage::new(data).with_attributes(&attributes))
+        .map(|data| {
+            PubSubMessage::new(data)
+                .with_attributes(HashMap::from([("type".to_string(), "Foo".to_string())]))
+        })
         .collect::<Vec<_>>();
     let message_ids = pub_sub_client.publish_raw(TOPIC_ID, messages, None).await?;
     let message_ids = message_ids.join(", ");
