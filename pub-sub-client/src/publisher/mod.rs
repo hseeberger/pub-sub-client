@@ -105,8 +105,8 @@ impl PubSubClient {
             .into_iter()
             .map(|(bytes, attributes)| RawPublishedMessage {
                 data: Some(base64::encode(bytes)),
-                attributes: attributes,
-                ordering_key: ordering_key,
+                attributes,
+                ordering_key,
             })
             .collect::<Vec<_>>();
 
