@@ -11,11 +11,13 @@ Aside from straight forward deserialization it is also possible to first transfo
 Typically we want to use domain message:
 
 ``` rust
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize, PublishedMessage)]
 struct Message {
     text: String,
 }
 ```
+
+In order to publish `Message`, we need to derive `Serialize` and `PublishedMessage` and to pull it we need to derive `Deserialize`.
 
 First create a `PubSubClient`, giving the path to a service account key file and the duration to refresh access tokens before they expire:
 
@@ -28,7 +30,7 @@ let pub_sub_client = PubSubClient::new(
 
 Things could go wrong, e.g. if the service account key file does not exist or is malformed, hence a `Result` is returned.
 
-Then we call `publish` to publish some `messages` using the given `TOPIC_ID` and – if all is good – get back the message IDs; we do not use a request timeout here and below for simplicity:
+Then we call `publish` to publish some `messages` using the given `TOPIC_ID` and – if all is good – get back the message IDs; we do not use an ordering key nor a request timeout here and below for simplicity:
 
 ``` rust
 let messages = vec!["Hello", "from pub-sub-client"]
@@ -36,7 +38,9 @@ let messages = vec!["Hello", "from pub-sub-client"]
     .map(|s| s.to_string())
     .map(|text| Message { text })
     .collect::<Vec<_>>();
-let message_ids = pub_sub_client.publish(TOPIC_ID, messages, None).await?;
+let message_ids = pub_sub_client
+    .publish(TOPIC_ID, messages, None, None)
+    .await?;
 let message_ids = message_ids.join(", ");
 println!("Published messages with IDs: {message_ids}");
 ```
