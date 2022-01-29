@@ -7,7 +7,7 @@ pub enum Error {
     #[error("Initialization error: {reason}")]
     Initialization {
         reason: String,
-        source: Box<dyn StdError>,
+        source: Box<dyn StdError + Send + Sync + 'static>,
     },
 
     #[error("Getting authentication token failed")]
