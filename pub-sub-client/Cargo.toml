@@ -26,11 +26,8 @@ smpl_jwt = "0.6"
 thiserror = "1.0"
 time = { version = "0.3", features = [ "serde-well-known" ] }
 tracing = "0.1"
-tracing-subscriber = { version = "0.3", features = [ "env-filter", "fmt", "json", "tracing-log" ] }
 
 [dev-dependencies]
-pub-sub-client-derive = { version = "=0.8.0", path = "../pub-sub-client-derive" }
 anyhow = "1.0"
 # TODO use published package once Pub/Sub has been included
 testcontainers = { git = "https://github.com/testcontainers/testcontainers-rs", branch = "dev" }
-tokio = { version = "1.15", features = [ "full" ] }

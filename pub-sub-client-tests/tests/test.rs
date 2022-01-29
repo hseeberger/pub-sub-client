@@ -1,7 +1,4 @@
-use pub_sub_client::publisher::PubSubMessage;
-use pub_sub_client::publisher::PublisherMessage;
-use pub_sub_client::PubSubClient;
-use pub_sub_client_derive::PublisherMessage;
+use pub_sub_client::{PubSubClient, PublishedMessage, RawPublishedMessage};
 use reqwest::{Client, StatusCode};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -16,7 +13,7 @@ const TOPIC_ID: &str = "test-topic";
 const SUBSCRIPTION_ID: &str = "test-subscription";
 const TEXT: &str = "test-text";
 
-#[derive(Debug, Deserialize, Serialize, PublisherMessage, PartialEq)]
+#[derive(Debug, Deserialize, Serialize, PublishedMessage, PartialEq)]
 enum Message {
     Foo { text: String },
     Bar { text: String },
@@ -68,7 +65,7 @@ async fn test() {
 
     // Publish raw
     let foo = base64::encode(json!({ "Foo": { "text": TEXT } }).to_string());
-    let messages = vec![PubSubMessage::new(foo)];
+    let messages = vec![RawPublishedMessage::new(foo)];
     let result = pub_sub_client
         .publish_raw(TOPIC_ID, messages, Some(Duration::from_secs(10)))
         .await;
@@ -142,7 +139,7 @@ async fn test() {
     assert!(result.is_ok());
     let result = result.unwrap();
     assert_eq!(result.len(), 1);
-    assert_eq!(result[0].pub_sub_message.id, message_id_3);
+    assert_eq!(result[0].message.id, message_id_3);
 
     // Acknowledge with invalid ACK ID
     let response = pub_sub_client
@@ -163,7 +160,7 @@ async fn test() {
 
     // Publish raw, only attributes
     let attributes = HashMap::from([("foo".to_string(), "bar".to_string())]);
-    let messages = vec![PubSubMessage::default().with_attributes(attributes)];
+    let messages = vec![RawPublishedMessage::default().with_attributes(attributes)];
     let result = pub_sub_client
         .publish_raw(TOPIC_ID, messages, Some(Duration::from_secs(10)))
         .await;
@@ -178,9 +175,9 @@ async fn test() {
     assert!(result.is_ok());
     let result = result.unwrap();
     assert_eq!(result.len(), 1);
-    assert!(result[0].pub_sub_message.data.is_none());
+    assert!(result[0].message.data.is_none());
     assert_eq!(
-        result[0].pub_sub_message.attributes,
+        result[0].message.attributes,
         HashMap::from([("foo".to_string(), "bar".to_string(),)])
     );
 

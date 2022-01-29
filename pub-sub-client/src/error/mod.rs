@@ -1,7 +1,6 @@
-use std::error::Error as StdError;
-
 use reqwest::Response;
 use serde_json::Value;
+use std::error::Error as StdError;
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {

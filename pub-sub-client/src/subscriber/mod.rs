@@ -23,17 +23,16 @@ pub struct PulledMessage<M: DeserializeOwned> {
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct ReceivedMessage {
+pub struct RawPulledMessageEnvelope {
     pub ack_id: String,
-    #[serde(rename = "message")]
-    pub pub_sub_message: PubSubMessage,
+    pub message: RawPulledMessage,
     #[serde(default)] // The Pub/Sub emulator does not send this field!
     pub delivery_attempt: u32,
 }
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct PubSubMessage {
+pub struct RawPulledMessage {
     pub data: Option<String>,
     #[serde(default)]
     pub attributes: HashMap<String, String>,
@@ -54,7 +53,7 @@ struct PullRequest {
 #[serde(rename_all = "camelCase")]
 struct PullResponse {
     #[serde(default)]
-    received_messages: Vec<ReceivedMessage>,
+    received_messages: Vec<RawPulledMessageEnvelope>,
 }
 
 #[derive(Debug, Serialize)]
@@ -85,7 +84,10 @@ impl PubSubClient {
     ) -> Result<Vec<Result<PulledMessage<M>, Error>>, Error>
     where
         M: DeserializeOwned + Debug,
-        T: Fn(&ReceivedMessage, Value) -> Result<Value, Box<dyn StdError + Send + Sync + 'static>>,
+        T: Fn(
+            &RawPulledMessageEnvelope,
+            Value,
+        ) -> Result<Value, Box<dyn StdError + Send + Sync + 'static>>,
     {
         let received_messages = self
             .pull_raw(subscription_id, max_messages, timeout)
@@ -100,7 +102,7 @@ impl PubSubClient {
         subscription_id: &str,
         max_messages: u32,
         timeout: Option<Duration>,
-    ) -> Result<Vec<ReceivedMessage>, Error> {
+    ) -> Result<Vec<RawPulledMessageEnvelope>, Error> {
         let url = self.subscription_url(subscription_id, "pull");
         let request = PullRequest { max_messages };
         debug!(message = "Sending request", url = display(&url));
@@ -149,18 +151,21 @@ impl PubSubClient {
 }
 
 fn deserialize<M, T>(
-    received_messages: Vec<ReceivedMessage>,
+    received_messages: Vec<RawPulledMessageEnvelope>,
     transform: T,
 ) -> Vec<Result<PulledMessage<M>, Error>>
 where
     M: DeserializeOwned,
-    T: Fn(&ReceivedMessage, Value) -> Result<Value, Box<dyn StdError + Send + Sync + 'static>>,
+    T: Fn(
+        &RawPulledMessageEnvelope,
+        Value,
+    ) -> Result<Value, Box<dyn StdError + Send + Sync + 'static>>,
 {
     received_messages
         .into_iter()
         .map(|received_message| {
             received_message
-                .pub_sub_message
+                .message
                 .data
                 .as_ref()
                 .ok_or(Error::NoData)
@@ -178,10 +183,10 @@ where
                         .map_err(|source| Error::Deserialize { source })
                 })
                 .map(|message| {
-                    let ReceivedMessage {
+                    let RawPulledMessageEnvelope {
                         ack_id,
-                        pub_sub_message:
-                            PubSubMessage {
+                        message:
+                            RawPulledMessage {
                                 data: _,
                                 attributes,
                                 id,
@@ -206,7 +211,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::{deserialize, Error, PubSubMessage, PulledMessage, ReceivedMessage};
+    use super::{deserialize, Error, PulledMessage, RawPulledMessage, RawPulledMessageEnvelope};
     use anyhow::anyhow;
     use serde::Deserialize;
     use serde_json::{json, Value};
@@ -226,9 +231,9 @@ mod tests {
     #[test]
     fn test_deserialize_ok() {
         let received_messages = vec![
-            ReceivedMessage {
+            RawPulledMessageEnvelope {
                 ack_id: "ack_id".to_string(),
-                pub_sub_message: PubSubMessage {
+                message: RawPulledMessage {
                     data: Some(base64::encode(json!({"text": "test"}).to_string())),
                     attributes: HashMap::from([("type".to_string(), "Foo".to_string())]),
                     id: "id".to_string(),
@@ -237,9 +242,9 @@ mod tests {
                 },
                 delivery_attempt: 1,
             },
-            ReceivedMessage {
+            RawPulledMessageEnvelope {
                 ack_id: "ack_id".to_string(),
-                pub_sub_message: PubSubMessage {
+                message: RawPulledMessage {
                     data: Some(base64::encode(json!({"Bar": {"text": "test"}}).to_string())),
                     attributes: HashMap::from([("version".to_string(), "v2".to_string())]),
                     id: "id".to_string(),
@@ -281,10 +286,10 @@ mod tests {
     }
 
     fn transform(
-        received_message: &ReceivedMessage,
+        received_message: &RawPulledMessageEnvelope,
         mut value: Value,
     ) -> Result<Value, Box<dyn StdError + Send + Sync + 'static>> {
-        let attributes = &received_message.pub_sub_message.attributes;
+        let attributes = &received_message.message.attributes;
         match attributes.get("version").map(|v| &v[..]).unwrap_or("v1") {
             "v1" => {
                 let mut type_keys = attributes

@@ -6,14 +6,14 @@ use std::fmt::Debug;
 use std::time::Duration;
 use tracing::debug;
 
-pub trait PublisherMessage: Serialize {}
+pub trait PublishedMessage: Serialize {}
 
-pub struct MessageEnvelope<M: PublisherMessage> {
+pub struct PublishedMessageEnvelope<M: PublishedMessage> {
     message: M,
     attributes: Option<HashMap<String, String>>,
 }
 
-impl<M: PublisherMessage> From<M> for MessageEnvelope<M> {
+impl<M: PublishedMessage> From<M> for PublishedMessageEnvelope<M> {
     fn from(message: M) -> Self {
         Self {
             message,
@@ -22,7 +22,7 @@ impl<M: PublisherMessage> From<M> for MessageEnvelope<M> {
     }
 }
 
-impl<M: PublisherMessage> From<(M, HashMap<String, String>)> for MessageEnvelope<M> {
+impl<M: PublishedMessage> From<(M, HashMap<String, String>)> for PublishedMessageEnvelope<M> {
     fn from((message, attributes): (M, HashMap<String, String>)) -> Self {
         Self {
             message,
@@ -33,13 +33,13 @@ impl<M: PublisherMessage> From<(M, HashMap<String, String>)> for MessageEnvelope
 
 #[derive(Debug, Default, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct PubSubMessage<'a> {
+pub struct RawPublishedMessage<'a> {
     pub data: Option<String>,
     pub attributes: Option<HashMap<String, String>>,
     pub ordering_key: Option<&'a str>,
 }
 
-impl<'a> PubSubMessage<'a> {
+impl<'a> RawPublishedMessage<'a> {
     pub fn new(data: String) -> Self {
         Self {
             data: Some(data),
@@ -67,7 +67,7 @@ impl<'a> PubSubMessage<'a> {
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct PublishRequest<'a> {
-    messages: Vec<PubSubMessage<'a>>,
+    messages: Vec<RawPublishedMessage<'a>>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -78,17 +78,21 @@ struct PublishResponse {
 
 impl PubSubClient {
     #[tracing::instrument]
-    pub async fn publish<'a, M: PublisherMessage, E: Into<MessageEnvelope<M>> + Debug>(
+    pub async fn publish<'a, M, E>(
         &self,
         topic_id: &str,
         envelopes: Vec<E>,
         ordering_key: Option<&'a str>,
         timeout: Option<Duration>,
-    ) -> Result<Vec<String>, Error> {
+    ) -> Result<Vec<String>, Error>
+    where
+        M: PublishedMessage,
+        E: Into<PublishedMessageEnvelope<M>> + Debug,
+    {
         let bytes = envelopes
             .into_iter()
             .map(|envelope| {
-                let MessageEnvelope {
+                let PublishedMessageEnvelope {
                     message,
                     attributes,
                 } = envelope.into();
@@ -99,7 +103,7 @@ impl PubSubClient {
         let messages = bytes
             .map_err(|source| Error::Serialize { source })?
             .into_iter()
-            .map(|(bytes, attributes)| PubSubMessage {
+            .map(|(bytes, attributes)| RawPublishedMessage {
                 data: Some(base64::encode(bytes)),
                 attributes: attributes,
                 ordering_key: ordering_key,
@@ -113,7 +117,7 @@ impl PubSubClient {
     pub async fn publish_raw<'a>(
         &self,
         topic_id: &str,
-        messages: Vec<PubSubMessage<'a>>,
+        messages: Vec<RawPublishedMessage<'a>>,
         timeout: Option<Duration>,
     ) -> Result<Vec<String>, Error> {
         let url = self.topic_url(topic_id);

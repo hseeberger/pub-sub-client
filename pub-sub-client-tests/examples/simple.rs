@@ -1,6 +1,4 @@
-use pub_sub_client::error::Error;
-use pub_sub_client::publisher::PublisherMessage;
-use pub_sub_client::PubSubClient;
+use pub_sub_client::{Error, PubSubClient, PublishedMessage};
 use serde::{Deserialize, Serialize};
 use std::error::Error as _;
 use std::time::Duration;
@@ -8,12 +6,10 @@ use std::time::Duration;
 const TOPIC_ID: &str = "test";
 const SUBSCRIPTION_ID: &str = "test";
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize, PublishedMessage)]
 struct Message {
     text: String,
 }
-
-impl PublisherMessage for Message {}
 
 #[tokio::main]
 async fn main() {
