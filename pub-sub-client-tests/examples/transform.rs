@@ -94,18 +94,29 @@ fn transform(
     value: Value,
 ) -> Result<Value, Box<dyn std::error::Error + Send + Sync + 'static>> {
     let attributes = &received_message.message.attributes;
-    match attributes.get("type") {
-        Some(t) => match value {
-            Value::Object(mut map) => {
-                map.insert("type".to_string(), Value::String(t.to_string()));
-                Ok(Value::Object(map))
+    match attributes {
+        Some(attributes) => match attributes.get("type") {
+            Some(t) => match value {
+                Value::Object(mut map) => {
+                    map.insert("type".to_string(), Value::String(t.to_string()));
+                    Ok(Value::Object(map))
+                }
+                other => Err(anyhow!("Unexpected JSON value `{other}`").into()),
+            },
+            None => {
+                let e = anyhow!(
+                    "Missing `type` attribute, message ID is `{}`",
+                    received_message.message.id
+                );
+                Err(e.into())
             }
-            other => Err(anyhow!("Unexpected JSON value `{other}`").into()),
         },
-        None => Err(anyhow!(
-            "Missing `type` attribute, message ID is `{}`",
-            received_message.message.id
-        )
-        .into()),
+        None => {
+            let e = anyhow!(
+                "Missing attributes, message ID is `{}`",
+                received_message.message.id
+            );
+            Err(e.into())
+        }
     }
 }

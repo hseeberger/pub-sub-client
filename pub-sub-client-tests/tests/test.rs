@@ -178,7 +178,7 @@ async fn test() {
     assert!(result[0].message.data.is_none());
     assert_eq!(
         result[0].message.attributes,
-        HashMap::from([("foo".to_string(), "bar".to_string(),)])
+        Some(HashMap::from([("foo".to_string(), "bar".to_string(),)]))
     );
 
     // Acknowledge
@@ -220,6 +220,6 @@ async fn test() {
     );
     assert_eq!(
         result[0].as_ref().unwrap().attributes,
-        HashMap::from([("version".to_string(), "v1".to_string())])
+        Some(HashMap::from([("version".to_string(), "v1".to_string())]))
     );
 }

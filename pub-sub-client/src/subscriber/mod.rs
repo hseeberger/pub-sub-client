@@ -14,7 +14,7 @@ use tracing::debug;
 pub struct PulledMessage<M: DeserializeOwned> {
     pub ack_id: String,
     pub message: M,
-    pub attributes: HashMap<String, String>,
+    pub attributes: Option<HashMap<String, String>>,
     pub id: String,
     pub publish_time: OffsetDateTime,
     pub ordering_key: Option<String>,
@@ -34,8 +34,7 @@ pub struct RawPulledMessageEnvelope {
 #[serde(rename_all = "camelCase")]
 pub struct RawPulledMessage {
     pub data: Option<String>,
-    #[serde(default)]
-    pub attributes: HashMap<String, String>,
+    pub attributes: Option<HashMap<String, String>>,
     #[serde(rename = "messageId")]
     pub id: String,
     #[serde(with = "time::serde::rfc3339")]
@@ -234,7 +233,7 @@ mod tests {
                 ack_id: "ack_id".to_string(),
                 message: RawPulledMessage {
                     data: Some(base64::encode(json!({"text": "test"}).to_string())),
-                    attributes: HashMap::from([("type".to_string(), "Foo".to_string())]),
+                    attributes: Some(HashMap::from([("type".to_string(), "Foo".to_string())])),
                     id: "id".to_string(),
                     publish_time: OffsetDateTime::parse(TIME, &Rfc3339).unwrap(),
                     ordering_key: Some("ordering_key".to_string()),
@@ -245,7 +244,7 @@ mod tests {
                 ack_id: "ack_id".to_string(),
                 message: RawPulledMessage {
                     data: Some(base64::encode(json!({"Bar": {"text": "test"}}).to_string())),
-                    attributes: HashMap::from([("version".to_string(), "v2".to_string())]),
+                    attributes: Some(HashMap::from([("version".to_string(), "v2".to_string())])),
                     id: "id".to_string(),
                     publish_time: OffsetDateTime::parse(TIME, &Rfc3339).unwrap(),
                     ordering_key: None,
@@ -263,7 +262,7 @@ mod tests {
         assert_eq!(pulled_message.ack_id, "ack_id".to_string());
         assert_eq!(
             pulled_message.attributes,
-            HashMap::from([("type".to_string(), "Foo".to_string())])
+            Some(HashMap::from([("type".to_string(), "Foo".to_string())]))
         );
         assert_eq!(
             pulled_message.message,
@@ -289,27 +288,30 @@ mod tests {
         mut value: Value,
     ) -> Result<Value, Box<dyn StdError + Send + Sync + 'static>> {
         let attributes = &envelope.message.attributes;
-        match attributes.get("version").map(|v| &v[..]).unwrap_or("v1") {
-            "v1" => {
-                let mut type_keys = attributes
-                    .keys()
-                    .filter(|key| **key == "type" || key.starts_with("type."))
-                    .map(|key| (&key[..], key.split(".").skip(1).collect::<Vec<_>>()))
-                    .collect::<Vec<_>>();
-                type_keys.sort_unstable_by(|v1, v2| v2.1.len().cmp(&v1.1.len()));
-                for (type_key, json_path) in type_keys {
-                    let sub_value = json_path
-                        .iter()
-                        .fold(Some(&mut value), |v, k| v.and_then(|v| v.get_mut(k)));
-                    if let Some(sub_value) = sub_value {
-                        let tpe = attributes.get(type_key).unwrap().to_string();
-                        *sub_value = json!({ tpe: sub_value });
+        match attributes {
+            Some(attributes) => match attributes.get("version").map(|v| &v[..]).unwrap_or("v1") {
+                "v1" => {
+                    let mut type_keys = attributes
+                        .keys()
+                        .filter(|key| **key == "type" || key.starts_with("type."))
+                        .map(|key| (&key[..], key.split(".").skip(1).collect::<Vec<_>>()))
+                        .collect::<Vec<_>>();
+                    type_keys.sort_unstable_by(|v1, v2| v2.1.len().cmp(&v1.1.len()));
+                    for (type_key, json_path) in type_keys {
+                        let sub_value = json_path
+                            .iter()
+                            .fold(Some(&mut value), |v, k| v.and_then(|v| v.get_mut(k)));
+                        if let Some(sub_value) = sub_value {
+                            let tpe = attributes.get(type_key).unwrap().to_string();
+                            *sub_value = json!({ tpe: sub_value });
+                        }
                     }
+                    Ok(value)
                 }
-                Ok(value)
-            }
-            "v2" => Ok(value),
-            unknown => Err(anyhow!("Unknow version `{unknown}`").into()),
+                "v2" => Ok(value),
+                unknown => Err(anyhow!("Unknow version `{unknown}`").into()),
+            },
+            None => Ok(value),
         }
     }
 }
