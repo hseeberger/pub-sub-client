@@ -1,5 +1,4 @@
-use pub_sub_client::error::Error;
-use pub_sub_client::PubSubClient;
+use pub_sub_client::{Error, PubSubClient, PublishedMessage};
 use serde::{Deserialize, Serialize};
 use std::error::Error as _;
 use std::time::Duration;
@@ -7,7 +6,7 @@ use std::time::Duration;
 const TOPIC_ID: &str = "test";
 const SUBSCRIPTION_ID: &str = "test";
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize, PublishedMessage)]
 struct Message {
     text: String,
 }
@@ -38,7 +37,9 @@ async fn run() -> Result<(), Error> {
         .map(|s| s.to_string())
         .map(|text| Message { text })
         .collect::<Vec<_>>();
-    let message_ids = pub_sub_client.publish(TOPIC_ID, messages, None).await?;
+    let message_ids = pub_sub_client
+        .publish(TOPIC_ID, messages, None, None)
+        .await?;
     let message_ids = message_ids.join(", ");
     println!("Published messages with IDs: {message_ids}");
 

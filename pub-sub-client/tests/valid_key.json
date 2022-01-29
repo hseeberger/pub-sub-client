@@ -1,0 +1,12 @@
+{
+  "type": "service_account",
+  "project_id": "test",
+  "private_key_id": "cea91d34cf9edc1c66bc1a9ce660b79d5d145ceb",
+  "private_key": "-----BEGIN PRIVATE KEY-----\nMIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQCuMxLjcu8pReX+\nKzfKwyqrBRJmgRh19JEvY5r7LrTBcmOMS69BxE04mA+fynD9fq6T+80cvsxpjnQV\n4Glc2hbXCHHZKtF9UAlGadXbxcPSO7IZ/6SifX8MNilxi4T0s0CbJPG08i8/0UdF\nukHC70u/BmAd9vVYpddgDyIM0xb+YHXIw4l76i0BR7a0mBxFLte6yTntb+SBbQUE\n4dxnOxJBmGXFD37Hj4t2vFKd4HQoIkaXrk+1wJWxOs/5IAjB1lcT3inNbt9qLQek\n3PDgIKd8sc6EC1dATdxke/4XLZbX+eF5td6/K5OHOrZcxRkM1BjfLo+bA0Op+S+N\ni9QXihwjAgMBAAECggEAAdp4+Wdm77uf8K43CQkZsmdD1v8SoWjwToMy7sqo2ojo\nmxg96Pmm/dK6pGYpuCsHUDJU8DRbfLN0BiprgkdBdhkYwrble/2yJv7sayZVqOUc\nRiP4B76OXVmcddfPdjAwVxGqjvlMHEGSMvy5DGV7Gvoz9ZkWD3eJ9hgcRH3OeBvO\nauKM5Va6U5gFSDWYI58c0fTUnA0YN4fAeCJrpxfFkTqSpCzi9h1wbWvBQAihS+tC\ne3xYequWJ4nYngrbspo0+jto2LaMbTSY1tyWlb14zpGuQOA1u3zwRfMdBq/lhXxa\nEo+WTOWhjcAmdhrqNXQWEEgBvwIPWeU2UjJ7LNv6mQKBgQDYIk03eLTlV0ZBxdLp\nVSg2Tz8GCSX2Afxgvw46BV4LRnudBk3/ltzBJXUSDz2SDkJ3PSiDoHrph0AWqWKn\noU0fuz/uF9gQzYh1FBq7byGxDd8JtZPSftM4AdYWTp9R8/BEdG1BosP07TrPy6xI\n3J0thZJ+ZfbOqOR90kX72uqFTQKBgQDOVKeY6SyyRzkY9XoEfnzlhmqu7SgBC30F\nB3Qm1eFmfS9mBmqKNCuW3VppYxiCIQNGZlWOw+aYgJ+rPmoicI38Y/ZRReL2kBlb\nvvdHoBLZd2c1yRq5Xg2VvalFXzcuTXPg3kg+vHMY+whfNX0wWR7rAV2kyouDIRPG\nj3+pzMyvLwKBgQDG1v/dCcK6v4kWV64LFloRZOShY+c1pWwPgZXQEUIM84Ij2zoE\n60EavKAwxi6p4U6KroxIVGrfz5tJffoSKBZxG+7b17ni84QX2jAhwkLnxdAs+Y0O\neblObHoOObTfS6H/CHG/kcPf4CRcKY/N1JER4TH98UaXp8/WZY4W/7cEfQKBgQDK\nxel73lR91H8ppz3GIuTt0T8RMKLq+/ZeteeRrwp4ZbjqRI35yrG370xGXAwe/wCv\n9CxLRP1fjLDeY1V9CS6RB1BwqQUXmaBCSRfN/WPo8m6tLjmkSOmC6sTrF1sslxO1\nv94yQZO/zh15LCEfHcbD4DC+nguj0CMWNbqaDlpuIwKBgH9Y8yAEdv2pCPRKqJGK\nhlJVEHGQkteADJXrm1dvwU0IVoUpRlL9NabiTjeRgJRZTSX+oMVKFSmtI6NJOAL/\nSi1IznPYjtkW9jFkR31oAWBwQgy/GL9n3DFuoVVUoRncbwpOQo+EAm6C/U9BN3eS\n7sq2Pa9AZ+fxdnfKEbjCwh41\n-----END PRIVATE KEY-----\n",
+  "client_email": "test@test.iam.gserviceaccount.com",
+  "client_id": "109921890120569461017",
+  "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+  "token_uri": "https://oauth2.googleapis.com/token",
+  "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+  "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/email-test%40akka-serverless-playground.iam.gserviceaccount.com"
+}

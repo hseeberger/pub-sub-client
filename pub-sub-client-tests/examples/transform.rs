@@ -1,8 +1,8 @@
 use anyhow::anyhow;
-use pub_sub_client::error::Error;
-use pub_sub_client::publisher::PubSubMessage;
-use pub_sub_client::subscriber::{PulledMessage, ReceivedMessage};
-use pub_sub_client::PubSubClient;
+use pub_sub_client::{
+    Error, PubSubClient, PublishedMessage, PulledMessage, RawPublishedMessage,
+    RawPulledMessageEnvelope,
+};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::collections::HashMap;
@@ -12,7 +12,7 @@ use std::time::Duration;
 const TOPIC_ID: &str = "test";
 const SUBSCRIPTION_ID: &str = "test";
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize, PublishedMessage)]
 #[serde(tag = "type")]
 #[allow(dead_code)]
 enum Message {
@@ -44,10 +44,9 @@ async fn run() -> Result<(), Error> {
     let messages = vec!["Hello", "from pub-sub-client"]
         .iter()
         .map(|s| base64::encode(json!({ "text": s }).to_string()))
-        .map(|data| PubSubMessage {
-            data: Some(data),
-            attributes: HashMap::from([("type".to_string(), "Foo".to_string())]),
-            ordering_key: None,
+        .map(|data| {
+            RawPublishedMessage::new(data)
+                .with_attributes(HashMap::from([("type".to_string(), "Foo".to_string())]))
         })
         .collect::<Vec<_>>();
     let message_ids = pub_sub_client.publish_raw(TOPIC_ID, messages, None).await?;
@@ -91,22 +90,33 @@ async fn run() -> Result<(), Error> {
 }
 
 fn transform(
-    received_message: &ReceivedMessage,
+    received_message: &RawPulledMessageEnvelope,
     value: Value,
 ) -> Result<Value, Box<dyn std::error::Error + Send + Sync + 'static>> {
-    let attributes = &received_message.pub_sub_message.attributes;
-    match attributes.get("type") {
-        Some(t) => match value {
-            Value::Object(mut map) => {
-                map.insert("type".to_string(), Value::String(t.to_string()));
-                Ok(Value::Object(map))
+    let attributes = &received_message.message.attributes;
+    match attributes {
+        Some(attributes) => match attributes.get("type") {
+            Some(t) => match value {
+                Value::Object(mut map) => {
+                    map.insert("type".to_string(), Value::String(t.to_string()));
+                    Ok(Value::Object(map))
+                }
+                other => Err(anyhow!("Unexpected JSON value `{other}`").into()),
+            },
+            None => {
+                let e = anyhow!(
+                    "Missing `type` attribute, message ID is `{}`",
+                    received_message.message.id
+                );
+                Err(e.into())
             }
-            other => Err(anyhow!("Unexpected JSON value `{other}`").into()),
         },
-        None => Err(anyhow!(
-            "Missing `type` attribute, message ID is `{}`",
-            received_message.pub_sub_message.id
-        )
-        .into()),
+        None => {
+            let e = anyhow!(
+                "Missing attributes, message ID is `{}`",
+                received_message.message.id
+            );
+            Err(e.into())
+        }
     }
 }

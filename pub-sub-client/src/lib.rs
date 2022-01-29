@@ -1,8 +1,14 @@
-pub mod error;
-pub mod publisher;
-pub mod subscriber;
+mod error;
+mod publisher;
+mod subscriber;
 
-use crate::error::Error;
+pub use error::*;
+pub use publisher::*;
+pub use subscriber::*;
+
+#[cfg(feature = "derive")]
+pub use pub_sub_client_derive::*;
+
 use goauth::auth::JwtClaims;
 use goauth::credentials::Credentials;
 use goauth::fetcher::TokenFetcher;
