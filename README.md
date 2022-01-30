@@ -1,6 +1,6 @@
-# Pub-Sub-Client #
+# Google Cloud Pub/Sub client
 
-Rust library to access Google Cloud Pub/Sub. Currently publishing, pulling and acknowledging are supported, but no management tasks like creating topics or subscriptions.
+Google Cloud Pub/Sub client library in [Rust](https://www.rust-lang.org/). Currently publishing, pulling and acknowledging are supported, but no management tasks like creating topics or subscriptions.
 
 Messages can either be published/pulled as raw or, if the payload is JSON data, serialized from/deserialized into domain messages (structs or enums) via [Serde](https://serde.rs/) and [Serde JSON](https://docs.serde.rs/serde_json). Both raw `ReceivedMessages` and "typed" `PulledMessages` expose metadata like message ID, acknowledge ID, attributes, etc.
 
