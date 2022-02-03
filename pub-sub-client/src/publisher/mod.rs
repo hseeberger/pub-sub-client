@@ -78,11 +78,11 @@ struct PublishResponse {
 
 impl PubSubClient {
     #[tracing::instrument]
-    pub async fn publish<'a, M, E>(
+    pub async fn publish<M, E>(
         &self,
         topic_id: &str,
         envelopes: Vec<E>,
-        ordering_key: Option<&'a str>,
+        ordering_key: Option<&'_ str>,
         timeout: Option<Duration>,
     ) -> Result<Vec<String>, Error>
     where
@@ -114,10 +114,10 @@ impl PubSubClient {
     }
 
     #[tracing::instrument]
-    pub async fn publish_raw<'a>(
+    pub async fn publish_raw(
         &self,
         topic_id: &str,
-        messages: Vec<RawPublishedMessage<'a>>,
+        messages: Vec<RawPublishedMessage<'_>>,
         timeout: Option<Duration>,
     ) -> Result<Vec<String>, Error> {
         let url = self.topic_url(topic_id);
