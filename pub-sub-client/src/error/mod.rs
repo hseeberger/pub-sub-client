@@ -1,5 +1,6 @@
 use reqwest::Response;
 use serde_json::Value;
+use std::convert::identity;
 use std::error::Error as StdError;
 
 #[derive(Debug, thiserror::Error)]
@@ -47,7 +48,7 @@ impl Error {
                         .map(|v| v["error"]["message"].to_string())
                         .map_err(|e| format!("Failed to parse error response: {e}"))
                 })
-                .unwrap(),
+                .unwrap_or_else(identity),
         )
     }
 }
