@@ -71,7 +71,7 @@ async fn run() -> Result<(), Error> {
             publish_time: _,
             ordering_key: _,
             delivery_attempt,
-        } = pulled_message?;
+        } = pulled_message;
         println!(
             "Pulled message `{message:?}` with ID {id} and {delivery_attempt}. delivery attempt"
         );

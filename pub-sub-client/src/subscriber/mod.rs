@@ -13,7 +13,7 @@ use tracing::debug;
 #[derive(Debug)]
 pub struct PulledMessage<M: DeserializeOwned> {
     pub ack_id: String,
-    pub message: M,
+    pub message: Result<M, Error>,
     pub attributes: Option<HashMap<String, String>>,
     pub id: String,
     pub publish_time: OffsetDateTime,
@@ -68,7 +68,7 @@ impl PubSubClient {
         subscription_id: &str,
         max_messages: u32,
         timeout: Option<Duration>,
-    ) -> Result<Vec<Result<PulledMessage<M>, Error>>, Error> {
+    ) -> Result<Vec<PulledMessage<M>>, Error> {
         self.pull_with_transform(subscription_id, max_messages, timeout, |_, value| Ok(value))
             .await
     }
@@ -80,7 +80,7 @@ impl PubSubClient {
         max_messages: u32,
         timeout: Option<Duration>,
         transform: T,
-    ) -> Result<Vec<Result<PulledMessage<M>, Error>>, Error>
+    ) -> Result<Vec<PulledMessage<M>>, Error>
     where
         M: DeserializeOwned + Debug,
         T: Fn(
@@ -153,7 +153,7 @@ impl PubSubClient {
 fn deserialize<M, T>(
     envelopes: Vec<RawPulledMessageEnvelope>,
     transform: T,
-) -> Vec<Result<PulledMessage<M>, Error>>
+) -> Vec<PulledMessage<M>>
 where
     M: DeserializeOwned,
     T: Fn(
@@ -164,7 +164,7 @@ where
     envelopes
         .into_iter()
         .map(|envelope| {
-            envelope
+            let message = envelope
                 .message
                 .data
                 .as_ref()
@@ -179,37 +179,35 @@ where
                 })
                 .and_then(|value| {
                     serde_json::from_value(value).map_err(|source| Error::Deserialize { source })
-                })
-                .map(|message| {
-                    let RawPulledMessageEnvelope {
-                        ack_id,
-                        message:
-                            RawPulledMessage {
-                                data: _,
-                                attributes,
-                                id,
-                                publish_time,
-                                ordering_key,
-                            },
-                        delivery_attempt,
-                    } = envelope;
-                    PulledMessage {
-                        ack_id,
-                        message,
+                });
+            let RawPulledMessageEnvelope {
+                ack_id,
+                message:
+                    RawPulledMessage {
+                        data: _,
                         attributes,
                         id,
                         publish_time,
                         ordering_key,
-                        delivery_attempt,
-                    }
-                })
+                    },
+                delivery_attempt,
+            } = envelope;
+            PulledMessage {
+                ack_id,
+                message,
+                attributes,
+                id,
+                publish_time,
+                ordering_key,
+                delivery_attempt,
+            }
         })
         .collect()
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{deserialize, Error, PulledMessage, RawPulledMessage, RawPulledMessageEnvelope};
+    use super::{deserialize, RawPulledMessage, RawPulledMessageEnvelope};
     use anyhow::anyhow;
     use serde::Deserialize;
     use serde_json::{json, Value};
@@ -252,31 +250,32 @@ mod tests {
                 delivery_attempt: 1,
             },
         ];
-        let pulled_messages: Vec<Result<PulledMessage<Message>, Error>> =
-            deserialize(envelopes, transform);
+        let pulled_messages = deserialize::<Message, _>(envelopes, transform);
         assert_eq!(pulled_messages.len(), 2);
 
-        assert!(pulled_messages[0].is_ok());
-        let pulled_message = pulled_messages[0].as_ref().unwrap();
+        let pulled_message = &pulled_messages[0];
         assert_eq!(pulled_message.id, "id".to_string());
         assert_eq!(pulled_message.ack_id, "ack_id".to_string());
         assert_eq!(
             pulled_message.attributes,
             Some(HashMap::from([("type".to_string(), "Foo".to_string())]))
         );
+        assert!(pulled_message.message.is_ok());
+        let message = pulled_message.message.as_ref().unwrap();
         assert_eq!(
-            pulled_message.message,
+            *message,
             Message::Foo {
                 text: "test".to_string()
             }
         );
 
-        assert!(pulled_messages[1].is_ok());
-        let pulled_message = pulled_messages[1].as_ref().unwrap();
+        let pulled_message = &pulled_messages[1];
         assert_eq!(pulled_message.id, "id".to_string());
         assert_eq!(pulled_message.ack_id, "ack_id".to_string());
+        assert!(pulled_message.message.is_ok());
+        let message = pulled_message.message.as_ref().unwrap();
         assert_eq!(
-            pulled_message.message,
+            *message,
             Message::Bar {
                 text: "test".to_string()
             }
