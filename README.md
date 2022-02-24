@@ -59,15 +59,15 @@ Finally we handle the pulled messages; for simplicity we only deal with the happ
 
 ``` rust
 for pulled_message in pulled_messages {
-    let pulled_message = pulled_message?;
-    let text = pulled_message.message.text;
-    println!("Pulled message with text \"{text}\"");
+    match pulled_message.message {
+        Ok(m) => println!("Pulled message with text \"{}\"", m.text),
+        Err(e) => eprintln!("ERROR: {e}"),
+    }
 
     pub_sub_client
         .acknowledge(SUBSCRIPTION_ID, vec![&pulled_message.ack_id], None)
         .await?;
-    let id = pulled_message.id;
-    println!("Successfully acknowledged message with ID {id}");
+    println!("Acknowledged message with ID {}", pulled_message.id);
 }
 ```
 
