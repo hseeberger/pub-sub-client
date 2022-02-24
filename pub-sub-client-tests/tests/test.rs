@@ -97,29 +97,32 @@ async fn test() {
     let result = result.unwrap();
     assert_eq!(result.len(), 3);
 
-    assert!(result[0].is_ok());
-    let ack_id_1 = &result[0].as_ref().unwrap().ack_id[..];
+    let ack_id_1 = &result[0].ack_id[..];
+    assert!(result[0].message.is_ok());
+    let message = result[0].message.as_ref().unwrap();
     assert_eq!(
-        result[0].as_ref().unwrap().message,
+        *message,
         Message::Foo {
             text: TEXT.to_string()
         }
     );
 
-    assert!(result[1].is_ok());
-    let ack_id_2 = &result[1].as_ref().unwrap().ack_id[..];
+    let ack_id_2 = &result[1].ack_id[..];
+    assert!(result[1].message.is_ok());
+    let message = result[1].message.as_ref().unwrap();
     assert_eq!(
-        result[1].as_ref().unwrap().message,
+        *message,
         Message::Bar {
             text: TEXT.to_string()
         }
     );
 
-    assert!(result[2].is_ok());
-    let ack_id_3 = &result[2].as_ref().unwrap().ack_id[..];
-    let message_id_3 = &result[2].as_ref().unwrap().id[..];
+    let ack_id_3 = &result[2].ack_id[..];
+    let message_id_3 = &result[2].id[..];
+    assert!(result[2].message.is_ok());
+    let message = result[2].message.as_ref().unwrap();
     assert_eq!(
-        result[2].as_ref().unwrap().message,
+        *message,
         Message::Bar {
             text: TEXT.to_string()
         }
@@ -210,16 +213,16 @@ async fn test() {
     let result = result.unwrap();
     assert_eq!(result.len(), 1);
 
-    eprintln!("{:?}", result[0]);
-    assert!(result[0].is_ok());
+    assert!(result[0].message.is_ok());
+    let message = result[0].message.as_ref().unwrap();
     assert_eq!(
-        result[0].as_ref().unwrap().message,
+        *message,
         Message::Foo {
             text: TEXT.to_string()
         }
     );
     assert_eq!(
-        result[0].as_ref().unwrap().attributes,
+        result[0].attributes,
         Some(HashMap::from([("version".to_string(), "v1".to_string())]))
     );
 }
