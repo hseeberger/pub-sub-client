@@ -96,7 +96,7 @@ impl PubSubClient {
             .post(url)
             .bearer_auth(token.access_token())
             .json(request);
-        let request = timeout.into_iter().fold(request, |r, t| r.timeout(t));
+        let request = timeout.map_or(request, |r, t| r.timeout(t));
 
         request
             .send()
