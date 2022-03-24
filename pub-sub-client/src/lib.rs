@@ -98,11 +98,10 @@ impl PubSubClient {
             .json(request);
         let request = timeout.into_iter().fold(request, |r, t| r.timeout(t));
 
-        let response = request
+        request
             .send()
             .await
-            .map_err(|source| Error::HttpServiceCommunication { source })?;
-        Ok(response)
+            .map_err(|source| Error::HttpServiceCommunication { source })
     }
 }
 
