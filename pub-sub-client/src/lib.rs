@@ -9,15 +9,11 @@ pub use subscriber::*;
 #[cfg(feature = "derive")]
 pub use pub_sub_client_derive::*;
 
-use goauth::auth::JwtClaims;
-use goauth::credentials::Credentials;
-use goauth::fetcher::TokenFetcher;
-use goauth::scopes::Scope;
+use goauth::{auth::JwtClaims, credentials::Credentials, fetcher::TokenFetcher, scopes::Scope};
 use reqwest::Response;
 use serde::Serialize;
 use smpl_jwt::Jwt;
-use std::env;
-use std::time::Duration;
+use std::{env, time::Duration};
 
 const BASE_URL_ENV_VAR: &str = "PUB_SUB_BASE_URL";
 const DEFAULT_BASE_URL: &str = "https://pubsub.googleapis.com";
@@ -37,7 +33,8 @@ impl std::fmt::Debug for PubSubClient {
 }
 
 impl PubSubClient {
-    pub fn new(key_path: &str, refresh_buffer: Duration) -> Result<Self, Error> {
+    pub fn new<T: AsRef<str>>(key_path: T, refresh_buffer: Duration) -> Result<Self, Error> {
+        let key_path = key_path.as_ref();
         let credentials =
             Credentials::from_file(key_path).map_err(|source| Error::Initialization {
                 reason: format!("Missing or malformed service account key at `{key_path}`"),
@@ -115,12 +112,6 @@ mod tests {
     enum Message {
         Foo { text: String },
         Bar { text: String },
-    }
-
-    #[test]
-    fn test_new_ok() {
-        let result = PubSubClient::new("tests/valid_key.json", Duration::from_secs(30));
-        assert!(result.is_ok());
     }
 
     #[test]

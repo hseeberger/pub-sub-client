@@ -1,2 +1,28 @@
 [workspace]
 members = [ "pub-sub-client", "pub-sub-client-derive", "pub-sub-client-tests" ]
+
+[workspace.package]
+version       = "0.10.1-alpha.0"
+edition       = "2021"
+description   = "Google Cloud Pub/Sub client library"
+authors       = [ "Heiko Seeberger <git@heikoseeberger.de>" ]
+license       = "Apache-2.0"
+readme        = "README.md"
+homepage      = "https://github.com/hseeberger/pub-sub-client"
+repository    = "https://github.com/hseeberger/pub-sub-client"
+documentation = "https://github.com/hseeberger/pub-sub-client"
+
+[workspace.dependencies]
+anyhow             = "1.0"
+base64             = "0.13"
+goauth             = "0.13"
+reqwest            = { version = "0.11" }
+serde              = { version = "1.0" }
+serde_json         = "1.0"
+smpl_jwt           = "0.7"
+thiserror          = "1.0"
+time               = { version = "0.3" }
+tracing            = "0.1"
+testcontainers     = "0.14"
+tokio              = "1.21"
+tracing-subscriber = "0.3"

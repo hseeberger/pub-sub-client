@@ -1,12 +1,7 @@
-use crate::error::Error;
-use crate::PubSubClient;
-use serde::de::DeserializeOwned;
-use serde::{Deserialize, Serialize};
+use crate::{error::Error, PubSubClient};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use serde_json::Value;
-use std::collections::HashMap;
-use std::error::Error as StdError;
-use std::fmt::Debug;
-use std::time::Duration;
+use std::{collections::HashMap, error::Error as StdError, fmt::Debug, time::Duration};
 use time::OffsetDateTime;
 use tracing::debug;
 
@@ -211,10 +206,8 @@ mod tests {
     use anyhow::anyhow;
     use serde::Deserialize;
     use serde_json::{json, Value};
-    use std::collections::HashMap;
-    use std::error::Error as StdError;
-    use time::format_description::well_known::Rfc3339;
-    use time::OffsetDateTime;
+    use std::{collections::HashMap, error::Error as StdError};
+    use time::{format_description::well_known::Rfc3339, OffsetDateTime};
 
     const TIME: &str = "2022-02-20T22:02:20.123456789Z";
 

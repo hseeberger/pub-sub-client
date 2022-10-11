@@ -1,7 +1,6 @@
 use pub_sub_client::{Error, PubSubClient, PublishedMessage};
 use serde::{Deserialize, Serialize};
-use std::error::Error as _;
-use std::time::Duration;
+use std::{env, error::Error as _, time::Duration};
 
 const TOPIC_ID: &str = "test";
 const SUBSCRIPTION_ID: &str = "test";
@@ -27,10 +26,9 @@ async fn main() {
 }
 
 async fn run() -> Result<(), Error> {
-    let pub_sub_client = PubSubClient::new(
-        "secrets/cryptic-hawk-336616-e228f9680cbc.json",
-        Duration::from_secs(30),
-    )?;
+    let dir = env::var("CARGO_MANIFEST_DIR").unwrap_or_else(|_| ".".to_string());
+    let key_path = format!("{dir}/secrets/active-road-365118-2eca6b7b8fd9.json");
+    let pub_sub_client = PubSubClient::new(key_path, Duration::from_secs(30))?;
 
     let messages = vec!["Hello", "from pub-sub-client"]
         .iter()
