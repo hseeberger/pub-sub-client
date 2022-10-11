@@ -12,7 +12,7 @@ documentation.workspace = true
 publish                 = false
 
 [dev-dependencies]
-pub-sub-client     = { version = "=0.11.0", path = "../pub-sub-client", features = [ "derive" ] }
+pub-sub-client     = { version = "=0.11.1-alpha.0", path = "../pub-sub-client", features = [ "derive" ] }
 anyhow             = { workspace = true }
 base64             = { workspace = true }
 reqwest            = { workspace = true, features = [ "json" ] }
