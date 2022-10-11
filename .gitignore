@@ -1,5 +1,4 @@
 Cargo.lock
-secrets
 target
 /.blackbox/pubring.gpg~
 /.blackbox/pubring.kbx~
