@@ -1,9 +1,6 @@
-use crate::error::Error;
-use crate::PubSubClient;
+use crate::{error::Error, PubSubClient};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
-use std::fmt::Debug;
-use std::time::Duration;
+use std::{collections::HashMap, fmt::Debug, time::Duration};
 use tracing::debug;
 
 pub trait PublishedMessage: Serialize {}

@@ -2,15 +2,15 @@ use pub_sub_client::{PubSubClient, PublishedMessage, RawPublishedMessage};
 use reqwest::{Client, StatusCode};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use std::collections::HashMap;
-use std::time::Duration;
-use std::{env, vec};
-use testcontainers::clients::Cli;
-use testcontainers::images::google_cloud_sdk_emulators::{CloudSdk, PUBSUB_PORT};
+use std::{collections::HashMap, env, time::Duration, vec};
+use testcontainers::{
+    clients::Cli,
+    images::google_cloud_sdk_emulators::{CloudSdk, PUBSUB_PORT},
+};
 
-const PROJECT_ID: &str = "cryptic-hawk-336616";
-const TOPIC_ID: &str = "test-topic";
-const SUBSCRIPTION_ID: &str = "test-subscription";
+const PROJECT_ID: &str = "active-road-365118";
+const TOPIC_ID: &str = "test";
+const SUBSCRIPTION_ID: &str = "test";
 const TEXT: &str = "test-text";
 
 #[derive(Debug, Deserialize, Serialize, PublishedMessage, PartialEq)]
@@ -24,7 +24,7 @@ async fn test() {
     // Set up testcontainers
     let docker_cli = Cli::default();
     let node = docker_cli.run(CloudSdk::pubsub());
-    let pubsub_port = node.get_host_port(PUBSUB_PORT);
+    let pubsub_port = node.get_host_port_ipv4(PUBSUB_PORT);
     let base_url = format!("http://localhost:{pubsub_port}");
     let topic_name = format!("projects/{PROJECT_ID}/topics/{TOPIC_ID}");
     let subscription_name = format!("projects/{PROJECT_ID}/subscriptions/{SUBSCRIPTION_ID}");
@@ -53,10 +53,10 @@ async fn test() {
 
     // Create PubSubClient
     // Notice: GitHub Actions write the `GCP_SERVICE_ACCOUNT` secret to the below key path,
-    // locally `secrets/cryptic-hawk-336616-e228f9680cbc.json.gpg` must be decrypted.
+    // locally the file must be decrypted.
     env::set_var("PUB_SUB_BASE_URL", base_url);
     let pub_sub_client = PubSubClient::new(
-        "secrets/cryptic-hawk-336616-e228f9680cbc.json",
+        "secrets/active-road-365118-2eca6b7b8fd9.json",
         Duration::from_secs(30),
     );
     env::set_var("PUB_SUB_BASE_URL", "");

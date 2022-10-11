@@ -1,9 +1,9 @@
 use reqwest::Response;
 use serde_json::Value;
-use std::convert::identity;
-use std::error::Error as StdError;
+use std::{convert::identity, error::Error as StdError};
+use thiserror::Error;
 
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug, Error)]
 pub enum Error {
     #[error("Initialization error: {reason}")]
     Initialization {

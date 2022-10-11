@@ -1,33 +1,30 @@
 [package]
-name = "pub-sub-client"
-version = "0.10.1-alpha.0"
-edition = "2021"
-rust-version = "1.58"
-
-description = "Google Cloud Pub/Sub client library"
-authors = [ "Heiko Seeberger <mail@heikoseeberger.rocks>" ]
-license-file = "LICENSE"
-readme = "README.md"
-homepage = "https://github.com/hseeberger/pub-sub-client"
-repository = "https://github.com/hseeberger/pub-sub-client"
-documentation = "https://github.com/hseeberger/pub-sub-client"
+name                    = "pub-sub-client"
+version.workspace       = true
+edition.workspace       = true
+description.workspace   = true
+authors.workspace       = true
+license.workspace       = true
+readme.workspace        = true
+homepage.workspace      = true
+repository.workspace    = true
+documentation.workspace = true
+exclude                 = [ "tests" ]
 
 [features]
 derive = [ "pub-sub-client-derive" ]
 
 [dependencies]
 pub-sub-client-derive = { version = "=0.10.1-alpha.0", optional = true, path = "../pub-sub-client-derive" }
-base64 = "0.13"
-goauth = "0.11"
-reqwest = { version = "0.11", features = [ "json" ] }
-serde = { version = "1.0", features = [ "derive" ] }
-serde_json = "1.0"
-smpl_jwt = "0.6"
-thiserror = "1.0"
-time = { version = "0.3", features = [ "serde-well-known" ] }
-tracing = "0.1"
+base64                = { workspace = true }
+goauth                = { workspace = true }
+reqwest               = { workspace = true, features = [ "json" ] }
+serde                 = { workspace = true, features = [ "derive" ] }
+serde_json            = { workspace = true }
+smpl_jwt              = { workspace = true }
+thiserror             = { workspace = true }
+time                  = { workspace = true, features = [ "serde-well-known" ] }
+tracing               = { workspace = true }
 
 [dev-dependencies]
-anyhow = "1.0"
-# TODO use published package once Pub/Sub has been included
-testcontainers = { git = "https://github.com/testcontainers/testcontainers-rs", branch = "dev" }
+anyhow = { workspace = true }
