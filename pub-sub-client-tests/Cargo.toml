@@ -10,7 +10,6 @@ homepage.workspace      = true
 repository.workspace    = true
 documentation.workspace = true
 publish                 = false
-exclude                 = [ "*" ]
 
 [dev-dependencies]
 pub-sub-client     = { version = "=0.10.1-alpha.0", path = "../pub-sub-client", features = [ "derive" ] }
