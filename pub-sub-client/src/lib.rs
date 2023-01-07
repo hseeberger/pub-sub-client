@@ -86,7 +86,9 @@ impl PubSubClient {
             .token_fetcher
             .fetch_token()
             .await
-            .map_err(|source| Error::TokenFetch { source })?;
+            .map_err(|source| Error::TokenFetch {
+                source: Box::new(source),
+            })?;
 
         let request = self
             .reqwest_client

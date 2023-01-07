@@ -2,12 +2,12 @@
 members = [ "pub-sub-client", "pub-sub-client-derive", "pub-sub-client-tests" ]
 
 [workspace.package]
-version       = "0.10.1-alpha.0"
+# No use to define version here, because cargo release ignores it!
+# version       = "0.10.1-alpha.0"
 edition       = "2021"
 description   = "Google Cloud Pub/Sub client library"
 authors       = [ "Heiko Seeberger <git@heikoseeberger.de>" ]
 license       = "Apache-2.0"
-readme        = "README.md"
 homepage      = "https://github.com/hseeberger/pub-sub-client"
 repository    = "https://github.com/hseeberger/pub-sub-client"
 documentation = "https://github.com/hseeberger/pub-sub-client"
