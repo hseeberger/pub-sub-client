@@ -1,5 +1,16 @@
 # Google Cloud Pub/Sub client
 
+[![Crates.io][crates-badge]][crates-url]
+[![license][license-badge]][license-url]
+[![build][build-badge]][build-url]
+
+[crates-badge]: https://img.shields.io/crates/v/pub-sub-client
+[crates-url]: https://crates.io/crates/pub-sub-client
+[license-badge]: https://img.shields.io/github/license/hseeberger/pub-sub-client
+[license-url]: https://github.com/hseeberger/pub-sub-client/blob/main/LICENSE
+[build-badge]: https://img.shields.io/github/actions/workflow/status/hseeberger/pub-sub-client/ci.yaml
+[build-url]: https://github.com/hseeberger/pub-sub-client/actions/workflows/ci.yaml
+
 Google Cloud Pub/Sub client library in [Rust](https://www.rust-lang.org/). Currently publishing, pulling and acknowledging are supported, but no management tasks like creating topics or subscriptions.
 
 Messages can either be published/pulled as raw or, if the payload is JSON data, serialized from/deserialized into domain messages (structs or enums) via [Serde](https://serde.rs/) and [Serde JSON](https://docs.serde.rs/serde_json). Both raw `ReceivedMessages` and "typed" `PulledMessages` expose metadata like message ID, acknowledge ID, attributes, etc.
