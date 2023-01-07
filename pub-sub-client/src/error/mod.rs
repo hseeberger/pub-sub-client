@@ -12,7 +12,7 @@ pub enum Error {
     },
 
     #[error("Getting authentication token failed")]
-    TokenFetch { source: goauth::GoErr },
+    TokenFetch { source: Box<goauth::GoErr> },
 
     #[error("HTTP communication with Pub/Sub service failed")]
     HttpServiceCommunication { source: reqwest::Error },
