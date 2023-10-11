@@ -1,4 +1,5 @@
 use crate::{error::Error, PubSubClient};
+use base64::{engine::general_purpose::STANDARD, Engine};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use serde_json::Value;
 use std::{collections::HashMap, error::Error as StdError, fmt::Debug, time::Duration};
@@ -164,7 +165,11 @@ where
                 .data
                 .as_ref()
                 .ok_or(Error::NoData)
-                .and_then(|data| base64::decode(data).map_err(|source| Error::NoBase64 { source }))
+                .and_then(|data| {
+                    STANDARD
+                        .decode(data)
+                        .map_err(|source| Error::NoBase64 { source })
+                })
                 .and_then(|bytes| {
                     serde_json::from_slice::<Value>(&bytes)
                         .map_err(|source| Error::Deserialize { source })
@@ -204,6 +209,7 @@ where
 mod tests {
     use super::{deserialize, RawPulledMessage, RawPulledMessageEnvelope};
     use anyhow::anyhow;
+    use base64::{engine::general_purpose::STANDARD, Engine};
     use serde::Deserialize;
     use serde_json::{json, Value};
     use std::{collections::HashMap, error::Error as StdError};
@@ -223,7 +229,7 @@ mod tests {
             RawPulledMessageEnvelope {
                 ack_id: "ack_id".to_string(),
                 message: RawPulledMessage {
-                    data: Some(base64::encode(json!({"text": "test"}).to_string())),
+                    data: Some(STANDARD.encode(json!({"text": "test"}).to_string())),
                     attributes: Some(HashMap::from([("type".to_string(), "Foo".to_string())])),
                     id: "id".to_string(),
                     publish_time: OffsetDateTime::parse(TIME, &Rfc3339).unwrap(),
@@ -234,7 +240,7 @@ mod tests {
             RawPulledMessageEnvelope {
                 ack_id: "ack_id".to_string(),
                 message: RawPulledMessage {
-                    data: Some(base64::encode(json!({"Bar": {"text": "test"}}).to_string())),
+                    data: Some(STANDARD.encode(json!({"Bar": {"text": "test"}}).to_string())),
                     attributes: Some(HashMap::from([("version".to_string(), "v2".to_string())])),
                     id: "id".to_string(),
                     publish_time: OffsetDateTime::parse(TIME, &Rfc3339).unwrap(),

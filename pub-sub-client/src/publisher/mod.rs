@@ -1,4 +1,5 @@
 use crate::{error::Error, PubSubClient};
+use base64::{engine::general_purpose::STANDARD, Engine};
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, fmt::Debug, time::Duration};
 use tracing::debug;
@@ -101,7 +102,7 @@ impl PubSubClient {
             .map_err(|source| Error::Serialize { source })?
             .into_iter()
             .map(|(bytes, attributes)| RawPublishedMessage {
-                data: Some(base64::encode(bytes)),
+                data: Some(STANDARD.encode(bytes)),
                 attributes,
                 ordering_key,
             })
