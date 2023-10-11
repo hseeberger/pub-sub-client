@@ -1,47 +1,44 @@
-name: CI
+name: ci
 
 on:
   push:
-    branches: [main]
+    branches:
+      - main
+    tags-ignore:
+      - v*
+
   pull_request:
-    branches: [main]
+    branches:
+      - main
 
 jobs:
-  test:
+  ci:
     runs-on: ubuntu-latest
     steps:
       - name: Check out
         uses: actions/checkout@v3
 
+      # Nightly needed for `cargo +nightly fmt` below
       - name: Install Rust toolchain
         run: |
           rustup update
-          rustup toolchain install nightly
+          rustup toolchain install nightly --profile minimal
           rustup component add rustfmt --toolchain nightly
-          rustup component add clippy --toolchain nightly
+          # rustup component add clippy --toolchain nightly
 
-      - name: Set up cargo cache
-        uses: actions/cache@v3
-        continue-on-error: false
+      - name: Install just
+        uses: taiki-e/install-action@v2
         with:
-          path: |
-            ~/.cargo/bin/
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-            target/
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: ${{ runner.os }}-cargo-
+          tool: just
 
-      - name: Check code format (cargo fmt)
-        run: cargo +nightly fmt --check
+      - name: Set up Rust cache
+        uses: Swatinem/rust-cache@v2
 
-      - name: Lint (cargo clippy)
-        run: cargo clippy --no-deps -- -D warnings
+      - name: Check code format
+        run: just fmt_check
 
-      - name: Test (cargo test)
-        env:
-          GCP_SERVICE_ACCOUNT: ${{ secrets.GCP_SERVICE_ACCOUNT }}
-        run: |
-          printenv GCP_SERVICE_ACCOUNT > pub-sub-client-tests/secrets/active-road-365118-2eca6b7b8fd9.json
-          cargo test
+      - name: Run linter
+        run: just lint
+
+      - name: Run tests
+        run: just test
