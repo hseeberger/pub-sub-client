@@ -20,19 +20,20 @@ documentation = "https://github.com/hseeberger/pub-sub-client"
 publish       = true
 
 [workspace.dependencies]
-anyhow             = { version = "1.0" }
-base64             = { version = "0.13" }
-goauth             = { version = "0.13" }
-proc-macro2        = { version = "1.0" }
-quote              = { version = "1.0" }
-reqwest            = { version = "0.11" }
-serde              = { version = "1.0" }
-serde_json         = { version = "1.0" }
-smpl_jwt           = { version = "0.7" }
-syn                = { version = "1.0" }
-testcontainers     = { version = "0.14" }
-thiserror          = { version = "1.0" }
-time               = { version = "0.3" }
-tokio              = { version = "1.21" }
-tracing            = { version = "0.1" }
-tracing-subscriber = { version = "0.3" }
+anyhow                 = { version = "1.0" }
+base64                 = { version = "0.21" }
+goauth                 = { version = "0.13" }
+proc-macro2            = { version = "1.0" }
+quote                  = { version = "1.0" }
+reqwest                = { version = "0.11" }
+serde                  = { version = "1.0" }
+serde_json             = { version = "1.0" }
+smpl_jwt               = { version = "0.7" }
+syn                    = { version = "2.0" }
+testcontainers         = { version = "0.15" }
+testcontainers-modules = { version = "0.1", features = [ "google_cloud_sdk_emulators" ] }
+thiserror              = { version = "1.0" }
+time                   = { version = "0.3" }
+tokio                  = { version = "1" }
+tracing                = { version = "0.1" }
+tracing-subscriber     = { version = "0.3" }

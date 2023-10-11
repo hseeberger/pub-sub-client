@@ -1,12 +1,11 @@
+use base64::{engine::general_purpose::STANDARD, Engine};
 use pub_sub_client::{PubSubClient, PublishedMessage, RawPublishedMessage};
 use reqwest::{Client, StatusCode};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::{collections::HashMap, env, time::Duration, vec};
-use testcontainers::{
-    clients::Cli,
-    images::google_cloud_sdk_emulators::{CloudSdk, PUBSUB_PORT},
-};
+use testcontainers::clients::Cli;
+use testcontainers_modules::google_cloud_sdk_emulators::{CloudSdk, PUBSUB_PORT};
 
 const PROJECT_ID: &str = "active-road-365118";
 const TOPIC_ID: &str = "test";
@@ -64,7 +63,7 @@ async fn test() {
     let pub_sub_client = pub_sub_client.unwrap();
 
     // Publish raw
-    let foo = base64::encode(json!({ "Foo": { "text": TEXT } }).to_string());
+    let foo = STANDARD.encode(json!({ "Foo": { "text": TEXT } }).to_string());
     let messages = vec![RawPublishedMessage::new(foo)];
     let result = pub_sub_client
         .publish_raw(TOPIC_ID, messages, Some(Duration::from_secs(10)))

@@ -12,12 +12,13 @@ documentation = { workspace = true }
 publish       = false
 
 [dev-dependencies]
-pub-sub-client     = { version = "=0.11.1-alpha.0", path = "../pub-sub-client", features = [ "derive" ] }
-anyhow             = { workspace = true }
-base64             = { workspace = true }
-reqwest            = { workspace = true, features = [ "json" ] }
-serde              = { workspace = true, features = [ "derive" ] }
-serde_json         = { workspace = true }
-testcontainers     = { workspace = true }
-tokio              = { workspace = true, features = [ "full" ] }
-tracing-subscriber = { workspace = true, features = [ "env-filter", "fmt", "json", "tracing-log" ] }
+pub-sub-client         = { version = "=0.11.1-alpha.0", path = "../pub-sub-client", features = [ "derive" ] }
+anyhow                 = { workspace = true }
+base64                 = { workspace = true }
+reqwest                = { workspace = true, features = [ "json" ] }
+serde                  = { workspace = true, features = [ "derive" ] }
+serde_json             = { workspace = true }
+testcontainers         = { workspace = true }
+testcontainers-modules = { workspace = true }
+tokio                  = { workspace = true, features = [ "full" ] }
+tracing-subscriber     = { workspace = true, features = [ "env-filter", "fmt", "json", "tracing-log" ] }

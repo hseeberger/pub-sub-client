@@ -1,4 +1,5 @@
 use anyhow::anyhow;
+use base64::{engine::general_purpose::STANDARD, Engine};
 use pub_sub_client::{
     Error, PubSubClient, PublishedMessage, PulledMessage, RawPublishedMessage,
     RawPulledMessageEnvelope,
@@ -40,7 +41,7 @@ async fn run() -> Result<(), Error> {
 
     let messages = vec!["Hello", "from pub-sub-client"]
         .iter()
-        .map(|s| base64::encode(json!({ "text": s }).to_string()))
+        .map(|s| STANDARD.encode(json!({ "text": s }).to_string()))
         .map(|data| {
             RawPublishedMessage::new(data)
                 .with_attributes(HashMap::from([("type".to_string(), "Foo".to_string())]))
