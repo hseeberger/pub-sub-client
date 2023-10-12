@@ -6,14 +6,15 @@ pub use error::*;
 pub use publisher::*;
 pub use subscriber::*;
 
-#[cfg(feature = "derive")]
-pub use pub_sub_client_derive::*;
-
 use goauth::{auth::JwtClaims, credentials::Credentials, fetcher::TokenFetcher, scopes::Scope};
 use reqwest::Response;
 use serde::Serialize;
 use smpl_jwt::Jwt;
-use std::{env, time::Duration};
+use std::{
+    env,
+    fmt::{self, Debug, Formatter},
+    time::Duration,
+};
 
 const BASE_URL_ENV_VAR: &str = "PUB_SUB_BASE_URL";
 const DEFAULT_BASE_URL: &str = "https://pubsub.googleapis.com";
@@ -24,20 +25,15 @@ pub struct PubSubClient {
     reqwest_client: reqwest::Client,
 }
 
-impl std::fmt::Debug for PubSubClient {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("PubSubClient")
-            .field("project_url", &self.project_url)
-            .finish()
-    }
-}
-
 impl PubSubClient {
-    pub fn new<T: AsRef<str>>(key_path: T, refresh_buffer: Duration) -> Result<Self, Error> {
+    pub fn new<T>(key_path: T, refresh_buffer: Duration) -> Result<Self, Error>
+    where
+        T: AsRef<str>,
+    {
         let key_path = key_path.as_ref();
         let credentials =
             Credentials::from_file(key_path).map_err(|source| Error::Initialization {
-                reason: format!("Missing or malformed service account key at `{key_path}`"),
+                reason: format!("missing or malformed service account key at `{key_path}`"),
                 source: source.into(),
             })?;
 
@@ -56,7 +52,7 @@ impl PubSubClient {
             credentials
                 .rsa_key()
                 .map_err(|source| Error::Initialization {
-                    reason: format!("Malformed private key in service account key at `{key_path}`"),
+                    reason: format!("malformed private key in service account key at `{key_path}`"),
                     source: source.into(),
                 })?,
             None,
@@ -65,7 +61,7 @@ impl PubSubClient {
         let refresh_buffer = refresh_buffer
             .try_into()
             .map_err(|source| Error::Initialization {
-                reason: format!("Invalid refresh_buffer `{refresh_buffer:?}`"),
+                reason: format!("invalid refresh_buffer `{refresh_buffer:?}`"),
                 source: Box::new(source),
             })?;
 
@@ -76,19 +72,16 @@ impl PubSubClient {
         })
     }
 
-    async fn send_request<R: Serialize>(
+    async fn send_request<R>(
         &self,
         url: &str,
         request: &R,
         timeout: Option<Duration>,
-    ) -> Result<Response, Error> {
-        let token = self
-            .token_fetcher
-            .fetch_token()
-            .await
-            .map_err(|source| Error::TokenFetch {
-                source: Box::new(source),
-            })?;
+    ) -> Result<Response, Error>
+    where
+        R: Serialize,
+    {
+        let token = self.token_fetcher.fetch_token().await.map_err(Box::new)?;
 
         let request = self
             .reqwest_client
@@ -100,7 +93,15 @@ impl PubSubClient {
         request
             .send()
             .await
-            .map_err(|source| Error::HttpServiceCommunication { source })
+            .map_err(Error::HttpServiceCommunication)
+    }
+}
+
+impl Debug for PubSubClient {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        f.debug_struct("PubSubClient")
+            .field("project_url", &self.project_url)
+            .finish()
     }
 }
 

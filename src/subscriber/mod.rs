@@ -7,7 +7,10 @@ use time::OffsetDateTime;
 use tracing::debug;
 
 #[derive(Debug)]
-pub struct PulledMessage<M: DeserializeOwned> {
+pub struct PulledMessage<M>
+where
+    M: DeserializeOwned,
+{
     pub ack_id: String,
     pub message: Result<M, Error>,
     pub attributes: Option<HashMap<String, String>>,
@@ -59,12 +62,15 @@ struct AcknowledgeRequest<'a> {
 
 impl PubSubClient {
     #[tracing::instrument]
-    pub async fn pull<M: DeserializeOwned + Debug>(
+    pub async fn pull<M>(
         &self,
         subscription_id: &str,
         max_messages: u32,
         timeout: Option<Duration>,
-    ) -> Result<Vec<PulledMessage<M>>, Error> {
+    ) -> Result<Vec<PulledMessage<M>>, Error>
+    where
+        M: DeserializeOwned + Debug,
+    {
         self.pull_with_transform(subscription_id, max_messages, timeout, |_, value| Ok(value))
             .await
     }
@@ -110,7 +116,7 @@ impl PubSubClient {
         let envelopes = response
             .json::<PullResponse>()
             .await
-            .map_err(|source| Error::UnexpectedHttpResponse { source })?
+            .map_err(Error::UnexpectedHttpResponse)?
             .envelopes;
 
         Ok(envelopes)
@@ -165,21 +171,12 @@ where
                 .data
                 .as_ref()
                 .ok_or(Error::NoData)
-                .and_then(|data| {
-                    STANDARD
-                        .decode(data)
-                        .map_err(|source| Error::NoBase64 { source })
-                })
+                .and_then(|data| STANDARD.decode(data).map_err(Error::DecodeBase64))
                 .and_then(|bytes| {
-                    serde_json::from_slice::<Value>(&bytes)
-                        .map_err(|source| Error::Deserialize { source })
+                    serde_json::from_slice::<Value>(&bytes).map_err(Error::Deserialize)
                 })
-                .and_then(|value| {
-                    transform(&envelope, value).map_err(|source| Error::Transform { source })
-                })
-                .and_then(|value| {
-                    serde_json::from_value(value).map_err(|source| Error::Deserialize { source })
-                });
+                .and_then(|value| transform(&envelope, value).map_err(Error::Transform))
+                .and_then(|value| serde_json::from_value(value).map_err(Error::Deserialize));
             let RawPulledMessageEnvelope {
                 ack_id,
                 message:

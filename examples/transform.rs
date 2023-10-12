@@ -1,8 +1,7 @@
 use anyhow::anyhow;
 use base64::{engine::general_purpose::STANDARD, Engine};
 use pub_sub_client::{
-    Error, PubSubClient, PublishedMessage, PulledMessage, RawPublishedMessage,
-    RawPulledMessageEnvelope,
+    Error, PubSubClient, PulledMessage, RawPublishedMessage, RawPulledMessageEnvelope,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -11,7 +10,7 @@ use std::{collections::HashMap, env, error::Error as _, time::Duration};
 const TOPIC_ID: &str = "test";
 const SUBSCRIPTION_ID: &str = "test";
 
-#[derive(Debug, Deserialize, Serialize, PublishedMessage)]
+#[derive(Debug, Serialize, Deserialize)]
 #[serde(tag = "type")]
 #[allow(dead_code)]
 enum Message {

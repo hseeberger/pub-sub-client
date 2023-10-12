@@ -13,7 +13,7 @@
 
 Google Cloud Pub/Sub client library in [Rust](https://www.rust-lang.org/). Currently publishing, pulling and acknowledging are supported, but no management tasks like creating topics or subscriptions.
 
-Messages can either be published/pulled as raw or, if the payload is JSON data, serialized from/deserialized into domain messages (structs or enums) via [Serde](https://serde.rs/) and [Serde JSON](https://docs.serde.rs/serde_json). Both raw `ReceivedMessages` and "typed" `PulledMessages` expose metadata like message ID, acknowledge ID, attributes, etc.
+Messages can either be published/pulled as raw or, if the payload is JSON data, serialized from/deserialized into domain messages (structs or enums) via [Serde](https://serde.rs/) and [Serde JSON](https://docs.serde.rs/serde_json). Both raw `RawPulledMessage`s and "typed" `PulledMessage`s expose metadata like message ID, acknowledge ID, attributes, etc.
 
 Aside from straight forward deserialization it is also possible to first transform the pulled JSON values before deserizlizing into domain messages which allows for generally adjusting the JSON structure as well as schema evolution.
 
@@ -22,13 +22,13 @@ Aside from straight forward deserialization it is also possible to first transfo
 Typically we want to use domain message:
 
 ``` rust
-#[derive(Debug, Deserialize, Serialize, PublishedMessage)]
+#[derive(Debug, Serialize, Deserialize)]
 struct Message {
     text: String,
 }
 ```
 
-In order to publish `Message`, we need to derive `Serialize` and `PublishedMessage` and to pull it we need to derive `Deserialize`.
+To publish `Message` we need to derive `Serialize` and to pull it we need to derive `Deserialize`.
 
 First create a `PubSubClient`, giving the path to a service account key file and the duration to refresh access tokens before they expire:
 
