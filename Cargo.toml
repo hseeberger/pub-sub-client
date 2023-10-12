@@ -1,6 +1,6 @@
 [package]
 name          = "pub-sub-client"
-version       = "0.12.0"
+version       = "0.12.1-alpha"
 edition       = "2021"
 description   = "Google Cloud Pub/Sub client library"
 authors       = [ "Heiko Seeberger <git@heikoseeberger.de>" ]
