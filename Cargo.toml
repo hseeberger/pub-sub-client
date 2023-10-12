@@ -1,6 +1,6 @@
 [package]
 name          = "pub-sub-client"
-version       = "0.11.1-alpha.0"
+version       = "0.12.0"
 edition       = "2021"
 description   = "Google Cloud Pub/Sub client library"
 authors       = [ "Heiko Seeberger <git@heikoseeberger.de>" ]
@@ -9,6 +9,7 @@ readme        = "README.md"
 homepage      = "https://github.com/hseeberger/pub-sub-client"
 repository    = "https://github.com/hseeberger/pub-sub-client"
 documentation = "https://github.com/hseeberger/pub-sub-client"
+exclude       = [ ".blackbox", ".github", "secrets" ]
 
 [dependencies]
 base64     = { version = "0.21" }
