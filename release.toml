@@ -1,3 +1,1 @@
-pre-release-commit-message = "release: released {{crate_name}} v{{version}}"
-post-release-commit-message = "release: bumping {{crate_name}} to v{{next_version}}"
-dev-version = true
+pre-release-commit-message = "release: v{{version}}"

@@ -4,14 +4,18 @@ use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, fmt::Debug, time::Duration};
 use tracing::debug;
 
-pub trait PublishedMessage: Serialize {}
-
-pub struct PublishedMessageEnvelope<M: PublishedMessage> {
+pub struct PublishedMessageEnvelope<M>
+where
+    M: Serialize,
+{
     message: M,
     attributes: Option<HashMap<String, String>>,
 }
 
-impl<M: PublishedMessage> From<M> for PublishedMessageEnvelope<M> {
+impl<M> From<M> for PublishedMessageEnvelope<M>
+where
+    M: Serialize,
+{
     fn from(message: M) -> Self {
         Self {
             message,
@@ -20,7 +24,10 @@ impl<M: PublishedMessage> From<M> for PublishedMessageEnvelope<M> {
     }
 }
 
-impl<M: PublishedMessage> From<(M, HashMap<String, String>)> for PublishedMessageEnvelope<M> {
+impl<M> From<(M, HashMap<String, String>)> for PublishedMessageEnvelope<M>
+where
+    M: Serialize,
+{
     fn from((message, attributes): (M, HashMap<String, String>)) -> Self {
         Self {
             message,
@@ -84,7 +91,7 @@ impl PubSubClient {
         timeout: Option<Duration>,
     ) -> Result<Vec<String>, Error>
     where
-        M: PublishedMessage,
+        M: Serialize,
         E: Into<PublishedMessageEnvelope<M>> + Debug,
     {
         let bytes = envelopes
@@ -99,7 +106,7 @@ impl PubSubClient {
             .collect::<Result<Vec<_>, _>>();
 
         let messages = bytes
-            .map_err(|source| Error::Serialize { source })?
+            .map_err(Error::Serialize)?
             .into_iter()
             .map(|(bytes, attributes)| RawPublishedMessage {
                 data: Some(STANDARD.encode(bytes)),
@@ -130,7 +137,7 @@ impl PubSubClient {
         let message_ids = response
             .json::<PublishResponse>()
             .await
-            .map_err(|source| Error::UnexpectedHttpResponse { source })?
+            .map_err(Error::UnexpectedHttpResponse)?
             .message_ids;
         debug!(
             message = "Request was successful",

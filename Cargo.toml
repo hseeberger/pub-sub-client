@@ -1,14 +1,6 @@
-[workspace]
-members = [
-  "pub-sub-client",
-  "pub-sub-client-derive",
-  "pub-sub-client-tests",
-]
-resolver = "2"
-
-[workspace.package]
-# No use to define version here, because cargo release ignores it!
-# version       = "0.10.1-alpha.0"
+[package]
+name          = "pub-sub-client"
+version       = "0.11.1-alpha.0"
 edition       = "2021"
 description   = "Google Cloud Pub/Sub client library"
 authors       = [ "Heiko Seeberger <git@heikoseeberger.de>" ]
@@ -17,23 +9,21 @@ readme        = "README.md"
 homepage      = "https://github.com/hseeberger/pub-sub-client"
 repository    = "https://github.com/hseeberger/pub-sub-client"
 documentation = "https://github.com/hseeberger/pub-sub-client"
-publish       = true
 
-[workspace.dependencies]
+[dependencies]
+base64     = { version = "0.21" }
+goauth     = { version = "0.13" }
+reqwest    = { version = "0.11", features = [ "json" ] }
+serde      = { version = "1.0", features = [ "derive" ] }
+serde_json = { version = "1.0" }
+smpl_jwt   = { version = "0.7" }
+thiserror  = { version = "1.0" }
+time       = { version = "0.3", features = [ "serde-well-known" ] }
+tracing    = { version = "0.1" }
+
+[dev-dependencies]
 anyhow                 = { version = "1.0" }
-base64                 = { version = "0.21" }
-goauth                 = { version = "0.13" }
-proc-macro2            = { version = "1.0" }
-quote                  = { version = "1.0" }
-reqwest                = { version = "0.11" }
-serde                  = { version = "1.0" }
-serde_json             = { version = "1.0" }
-smpl_jwt               = { version = "0.7" }
-syn                    = { version = "2.0" }
 testcontainers         = { version = "0.15" }
 testcontainers-modules = { version = "0.1", features = [ "google_cloud_sdk_emulators" ] }
-thiserror              = { version = "1.0" }
-time                   = { version = "0.3" }
-tokio                  = { version = "1" }
-tracing                = { version = "0.1" }
-tracing-subscriber     = { version = "0.3" }
+tokio                  = { version = "1", features = [ "macros", "rt-multi-thread" ] }
+tracing-subscriber     = { version = "0.3", features = [ "env-filter", "fmt", "json" ] }

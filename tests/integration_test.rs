@@ -1,5 +1,5 @@
 use base64::{engine::general_purpose::STANDARD, Engine};
-use pub_sub_client::{PubSubClient, PublishedMessage, RawPublishedMessage};
+use pub_sub_client::{PubSubClient, RawPublishedMessage};
 use reqwest::{Client, StatusCode};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -12,7 +12,7 @@ const TOPIC_ID: &str = "test";
 const SUBSCRIPTION_ID: &str = "test";
 const TEXT: &str = "test-text";
 
-#[derive(Debug, Deserialize, Serialize, PublishedMessage, PartialEq)]
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
 enum Message {
     Foo { text: String },
     Bar { text: String },
@@ -198,7 +198,7 @@ async fn test() {
         HashMap::from([("version".to_string(), "v1".to_string())]),
     )];
     let result = pub_sub_client
-        .publish(TOPIC_ID, messages, None, Some(Duration::from_secs(10)))
+        .publish::<Message, _>(TOPIC_ID, messages, None, Some(Duration::from_secs(10)))
         .await;
     assert!(result.is_ok());
     let result = result.unwrap();

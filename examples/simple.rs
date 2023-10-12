@@ -1,11 +1,11 @@
-use pub_sub_client::{Error, PubSubClient, PublishedMessage};
+use pub_sub_client::{Error, PubSubClient};
 use serde::{Deserialize, Serialize};
 use std::{env, error::Error as _, time::Duration};
 
 const TOPIC_ID: &str = "test";
 const SUBSCRIPTION_ID: &str = "test";
 
-#[derive(Debug, Deserialize, Serialize, PublishedMessage)]
+#[derive(Debug, Serialize, Deserialize)]
 struct Message {
     text: String,
 }
