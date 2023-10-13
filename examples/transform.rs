@@ -48,7 +48,7 @@ async fn run() -> Result<(), Error> {
         .collect::<Vec<_>>();
     let message_ids = pub_sub_client.publish_raw(TOPIC_ID, messages, None).await?;
     let message_ids = message_ids.join(", ");
-    println!("Published messages with IDs: {message_ids}");
+    println!("published messages with IDs: {message_ids}");
 
     let pulled_messages = pub_sub_client
         .pull_with_transform::<Message, _>(
@@ -70,7 +70,7 @@ async fn run() -> Result<(), Error> {
             delivery_attempt,
         } = pulled_message;
         println!(
-            "Pulled message `{message:?}` with ID {id} and {delivery_attempt}. delivery attempt"
+            "pulled message `{message:?}` with ID {id} and {delivery_attempt}. delivery attempt"
         );
 
         pub_sub_client
@@ -80,7 +80,7 @@ async fn run() -> Result<(), Error> {
                 Some(Duration::from_secs(10)),
             )
             .await?;
-        println!("Successfully acknowledged message with ID {id}");
+        println!("acknowledged message with ID {id}");
     }
 
     Ok(())
@@ -98,11 +98,11 @@ fn transform(
                     map.insert("type".to_string(), Value::String(t.to_string()));
                     Ok(Value::Object(map))
                 }
-                other => Err(anyhow!("Unexpected JSON value `{other}`").into()),
+                other => Err(anyhow!("unexpected JSON value `{other}`").into()),
             },
             None => {
                 let e = anyhow!(
-                    "Missing `type` attribute, message ID is `{}`",
+                    "missing `type` attribute, message ID is `{}`",
                     received_message.message.id
                 );
                 Err(e.into())
@@ -110,7 +110,7 @@ fn transform(
         },
         None => {
             let e = anyhow!(
-                "Missing attributes, message ID is `{}`",
+                "missing attributes, message ID is `{}`",
                 received_message.message.id
             );
             Err(e.into())

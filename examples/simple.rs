@@ -39,7 +39,7 @@ async fn run() -> Result<(), Error> {
         .publish(TOPIC_ID, messages, None, None)
         .await?;
     let message_ids = message_ids.join(", ");
-    println!("Published messages with IDs: {message_ids}");
+    println!("published messages with IDs: {message_ids}");
 
     let pulled_messages = pub_sub_client
         .pull::<Message>(SUBSCRIPTION_ID, 42, None)
@@ -47,14 +47,14 @@ async fn run() -> Result<(), Error> {
 
     for pulled_message in pulled_messages {
         match pulled_message.message {
-            Ok(m) => println!("Pulled message with text \"{}\"", m.text),
+            Ok(m) => println!("pulled message with text \"{}\"", m.text),
             Err(e) => eprintln!("ERROR: {e}"),
         }
 
         pub_sub_client
             .acknowledge(SUBSCRIPTION_ID, vec![&pulled_message.ack_id], None)
             .await?;
-        println!("Acknowledged message with ID {}", pulled_message.id);
+        println!("acknowledged message with ID {}", pulled_message.id);
     }
 
     Ok(())
