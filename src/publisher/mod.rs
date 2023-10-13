@@ -127,7 +127,7 @@ impl PubSubClient {
     ) -> Result<Vec<String>, Error> {
         let url = self.topic_url(topic_id);
         let request = PublishRequest { messages };
-        debug!(message = "Sending request", url = display(&url));
+        debug!(url, "sending request");
         let response = self.send_request(&url, &request, timeout).await?;
 
         if !response.status().is_success() {
@@ -139,10 +139,7 @@ impl PubSubClient {
             .await
             .map_err(Error::UnexpectedHttpResponse)?
             .message_ids;
-        debug!(
-            message = "Request was successful",
-            message_ids = debug(&message_ids)
-        );
+        debug!(?message_ids, "successfully published");
         Ok(message_ids)
     }
 

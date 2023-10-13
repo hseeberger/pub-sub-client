@@ -106,7 +106,7 @@ impl PubSubClient {
     ) -> Result<Vec<RawPulledMessageEnvelope>, Error> {
         let url = self.subscription_url(subscription_id, "pull");
         let request = PullRequest { max_messages };
-        debug!(message = "Sending request", url = display(&url));
+        debug!(url, "sending request");
         let response = self.send_request(&url, &request, timeout).await?;
 
         if !response.status().is_success() {
