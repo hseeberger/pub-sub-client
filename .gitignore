@@ -4,3 +4,4 @@ target
 /.blackbox/pubring.kbx~
 /.blackbox/secring.gpg
 active-road-*.json
+/secrets/active-road-365118-0214022979ee.json
