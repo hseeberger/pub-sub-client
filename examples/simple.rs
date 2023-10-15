@@ -27,7 +27,7 @@ async fn main() {
 
 async fn run() -> Result<(), Error> {
     let dir = env::var("CARGO_MANIFEST_DIR").unwrap_or_else(|_| ".".to_string());
-    let key_path = format!("{dir}/secrets/active-road-365118-2eca6b7b8fd9.json");
+    let key_path = format!("{dir}/secrets/active-road-365118-0214022979ee.json");
     let pub_sub_client = PubSubClient::new(key_path, Duration::from_secs(30))?;
 
     let messages = vec!["Hello", "from pub-sub-client"]

@@ -55,7 +55,7 @@ async fn test() {
     // locally the file must be decrypted.
     env::set_var("PUB_SUB_BASE_URL", base_url);
     let pub_sub_client = PubSubClient::new(
-        "secrets/active-road-365118-2eca6b7b8fd9.json",
+        "secrets/active-road-365118-0214022979ee.json",
         Duration::from_secs(30),
     );
     env::set_var("PUB_SUB_BASE_URL", "");
