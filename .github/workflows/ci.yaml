@@ -44,5 +44,5 @@ jobs:
         env:
           GCP_SERVICE_ACCOUNT: ${{ secrets.GCP_SERVICE_ACCOUNT }}
         run: |
-          printenv GCP_SERVICE_ACCOUNT > secrets/active-road-365118-2eca6b7b8fd9.json
+          printenv GCP_SERVICE_ACCOUNT > secrets/active-road-365118-0214022979ee.json
           just test
