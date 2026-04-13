@@ -13,7 +13,7 @@ exclude       = [ ".blackbox", ".github", "secrets" ]
 
 [dependencies]
 base64     = { version = "0.21" }
-goauth     = { version = "0.13" }
+goauth     = { version = "0.17" }
 reqwest    = { version = "0.11", features = [ "json" ] }
 serde      = { version = "1.0", features = [ "derive" ] }
 serde_json = { version = "1.0" }
