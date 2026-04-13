@@ -25,6 +25,6 @@ tracing    = { version = "0.1" }
 [dev-dependencies]
 anyhow                 = { version = "1.0" }
 testcontainers         = { version = "0.15" }
-testcontainers-modules = { version = "0.1", features = [ "google_cloud_sdk_emulators" ] }
+testcontainers-modules = { version = "0.15", features = [ "google_cloud_sdk_emulators" ] }
 tokio                  = { version = "1", features = [ "macros", "rt-multi-thread" ] }
 tracing-subscriber     = { version = "0.3", features = [ "env-filter", "fmt", "json" ] }
