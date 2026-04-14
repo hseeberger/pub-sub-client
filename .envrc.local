@@ -1,0 +1,5 @@
+source_up
+
+dir=$(mktemp -d)
+cp ~/.secrets/test-493315-71638f87df20.json $dir/service-account.json
+export SERVICE_ACCOUNT_PATH=$dir/service-account.json

@@ -1,6 +1,6 @@
-use crate::{error::Error, PubSubClient};
-use base64::{engine::general_purpose::STANDARD, Engine};
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use crate::{PubSubClient, error::Error};
+use base64::{Engine, engine::general_purpose::STANDARD};
+use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use serde_json::Value;
 use std::{collections::HashMap, error::Error as StdError, fmt::Debug, time::Duration};
 use time::OffsetDateTime;
@@ -204,13 +204,13 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::{deserialize, RawPulledMessage, RawPulledMessageEnvelope};
+    use super::{RawPulledMessage, RawPulledMessageEnvelope, deserialize};
     use anyhow::anyhow;
-    use base64::{engine::general_purpose::STANDARD, Engine};
+    use base64::{Engine, engine::general_purpose::STANDARD};
     use serde::Deserialize;
-    use serde_json::{json, Value};
+    use serde_json::{Value, json};
     use std::{collections::HashMap, error::Error as StdError};
-    use time::{format_description::well_known::Rfc3339, OffsetDateTime};
+    use time::{OffsetDateTime, format_description::well_known::Rfc3339};
 
     const TIME: &str = "2022-02-20T22:02:20.123456789Z";
 
@@ -293,9 +293,7 @@ mod tests {
                         .collect::<Vec<_>>();
                     type_keys.sort_unstable_by(|v1, v2| v2.1.len().cmp(&v1.1.len()));
                     for (type_key, json_path) in type_keys {
-                        let sub_value = json_path
-                            .iter()
-                            .fold(Some(&mut value), |v, k| v.and_then(|v| v.get_mut(k)));
+                        let sub_value = json_path.iter().try_fold(&mut value, |v, k| v.get_mut(k));
                         if let Some(sub_value) = sub_value {
                             let tpe = attributes.get(type_key).unwrap().to_string();
                             *sub_value = json!({ tpe: sub_value });

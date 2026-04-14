@@ -1,5 +1,5 @@
-use crate::{error::Error, PubSubClient};
-use base64::{engine::general_purpose::STANDARD, Engine};
+use crate::{PubSubClient, error::Error};
+use base64::{Engine, engine::general_purpose::STANDARD};
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, fmt::Debug, time::Duration};
 use tracing::debug;

@@ -1,18 +1,29 @@
 set shell := ["bash", "-uc"]
 
+nightly := `grep nightly rust-toolchain.toml | sed -r 's/# nightly = "(.*)"/\1/'`
+
 check:
 	cargo check --tests
 
 fmt:
-	cargo +nightly fmt
+    cargo +{{nightly}} fmt
 
-fmt_check:
-	cargo +nightly fmt --check
+fmt-check:
+    cargo +{{nightly}} fmt --check
+
+fix:
+	cargo fix --tests --allow-dirty --allow-staged
 
 lint:
-	cargo clippy --no-deps -- -D warnings
+	cargo clippy --tests --no-deps -- -D warnings
+
+lint-fix:
+	cargo clippy --tests --no-deps --allow-dirty --allow-staged --fix
 
 test:
 	cargo test
 
-all: fmt check lint test
+doc:
+	cargo doc --no-deps
+
+all: check fmt lint test doc
