@@ -8,10 +8,10 @@ use std::{collections::HashMap, env, error::Error, time::Duration, vec};
 use testcontainers::runners::AsyncRunner;
 use testcontainers_modules::google_cloud_sdk_emulators::{CloudSdk, PUBSUB_PORT};
 
-const PROJECT_ID: &str = "test-493315";
-const TOPIC_ID: &str = "test";
-const SUBSCRIPTION_ID: &str = "test";
-const TEXT: &str = "test-text";
+const PROJECT_ID: &str = "test-493315"; // Must match the project ID of the service account key!
+const TOPIC_ID: &str = "test-topic";
+const SUBSCRIPTION_ID: &str = "test-sub";
+const TEXT: &str = "test-message";
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 enum Message {
