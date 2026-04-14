@@ -114,8 +114,6 @@ jobs:
           dir="$(mktemp -d)"
           echo "$GCP_SERVICE_ACCOUNT" > "$dir/service-account.json"
           export SERVICE_ACCOUNT_PATH="$dir/service-account.json"
-          echo SERVICE_ACCOUNT_PATH=$SERVICE_ACCOUNT_PATH
-          cat $SERVICE_ACCOUNT_PATH
           rustup override set ${{needs.setup-toolchain.outputs.stable}}
           just test
 

@@ -26,16 +26,15 @@ pub struct PubSubClient {
 }
 
 impl PubSubClient {
-    pub fn new<T>(key_path: T, refresh_buffer: Duration) -> Result<Self, Error>
-    where
-        T: AsRef<str>,
-    {
+    pub fn new(key_path: impl AsRef<str>, refresh_buffer: Duration) -> Result<Self, Error> {
         let key_path = key_path.as_ref();
+
         let credentials =
             Credentials::from_file(key_path).map_err(|error| Error::Initialization {
                 reason: format!("missing or malformed service account key at `{key_path}`"),
                 source: error.into(),
             })?;
+        println!("{credentials:?}");
 
         let base_url = env::var(BASE_URL_ENV_VAR).unwrap_or_else(|_| DEFAULT_BASE_URL.to_string());
         let project_id = credentials.project();

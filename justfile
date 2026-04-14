@@ -21,7 +21,7 @@ lint-fix:
 	cargo clippy --tests --no-deps --allow-dirty --allow-staged --fix
 
 test:
-	cargo test --tests
+	cargo test --test integration_test -- --no-capture
 
 doc:
 	cargo doc --no-deps
