@@ -1,13 +1,13 @@
-use base64::{engine::general_purpose::STANDARD, Engine};
+use base64::{Engine, engine::general_purpose::STANDARD};
 use pub_sub_client::{PubSubClient, RawPublishedMessage};
 use reqwest::{Client, StatusCode};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use std::{collections::HashMap, env, time::Duration, vec};
-use testcontainers::clients::Cli;
+use std::{collections::HashMap, env, error::Error, time::Duration, vec};
+use testcontainers::runners::AsyncRunner;
 use testcontainers_modules::google_cloud_sdk_emulators::{CloudSdk, PUBSUB_PORT};
 
-const PROJECT_ID: &str = "active-road-365118";
+const PROJECT_ID: &str = "test-493315";
 const TOPIC_ID: &str = "test";
 const SUBSCRIPTION_ID: &str = "test";
 const TEXT: &str = "test-text";
@@ -19,11 +19,10 @@ enum Message {
 }
 
 #[tokio::test]
-async fn test() {
-    // Set up testcontainers
-    let docker_cli = Cli::default();
-    let node = docker_cli.run(CloudSdk::pubsub());
-    let pubsub_port = node.get_host_port_ipv4(PUBSUB_PORT);
+async fn test() -> Result<(), Box<dyn Error>> {
+    // Set up Pub/Sub
+    let pubsub = CloudSdk::pubsub().start().await?;
+    let pubsub_port = pubsub.get_host_port_ipv4(PUBSUB_PORT).await?;
     let base_url = format!("http://localhost:{pubsub_port}");
     let topic_name = format!("projects/{PROJECT_ID}/topics/{TOPIC_ID}");
     let subscription_name = format!("projects/{PROJECT_ID}/subscriptions/{SUBSCRIPTION_ID}");
@@ -53,12 +52,13 @@ async fn test() {
     // Create PubSubClient
     // Notice: GitHub Actions write the `GCP_SERVICE_ACCOUNT` secret to the below key path,
     // locally the file must be decrypted.
-    env::set_var("PUB_SUB_BASE_URL", base_url);
-    let pub_sub_client = PubSubClient::new(
-        "secrets/active-road-365118-0214022979ee.json",
-        Duration::from_secs(30),
-    );
-    env::set_var("PUB_SUB_BASE_URL", "");
+    unsafe {
+        env::set_var("PUB_SUB_BASE_URL", base_url);
+    }
+    let pub_sub_client = PubSubClient::new(env!("SERVICE_ACCOUNT_PATH"), Duration::from_secs(30));
+    unsafe {
+        env::set_var("PUB_SUB_BASE_URL", "");
+    }
     assert!(pub_sub_client.is_ok());
     let pub_sub_client = pub_sub_client.unwrap();
 
@@ -224,4 +224,6 @@ async fn test() {
         result[0].attributes,
         Some(HashMap::from([("version".to_string(), "v1".to_string())]))
     );
+
+    Ok(())
 }

@@ -1,10 +1,10 @@
 use anyhow::anyhow;
-use base64::{engine::general_purpose::STANDARD, Engine};
+use base64::{Engine, engine::general_purpose::STANDARD};
 use pub_sub_client::{
     Error, PubSubClient, PulledMessage, RawPublishedMessage, RawPulledMessageEnvelope,
 };
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use std::{collections::HashMap, env, error::Error as _, time::Duration};
 
 const TOPIC_ID: &str = "test";

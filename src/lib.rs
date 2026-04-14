@@ -32,9 +32,9 @@ impl PubSubClient {
     {
         let key_path = key_path.as_ref();
         let credentials =
-            Credentials::from_file(key_path).map_err(|source| Error::Initialization {
+            Credentials::from_file(key_path).map_err(|error| Error::Initialization {
                 reason: format!("missing or malformed service account key at `{key_path}`"),
-                source: source.into(),
+                source: error.into(),
             })?;
 
         let base_url = env::var(BASE_URL_ENV_VAR).unwrap_or_else(|_| DEFAULT_BASE_URL.to_string());
@@ -44,30 +44,23 @@ impl PubSubClient {
         let jwt = Jwt::new(
             JwtClaims::new(
                 credentials.iss(),
-                &Scope::PubSub,
+                &[Scope::PubSub],
                 credentials.token_uri(),
                 None,
                 None,
             ),
             credentials
                 .rsa_key()
-                .map_err(|source| Error::Initialization {
+                .map_err(|error| Error::Initialization {
                     reason: format!("malformed private key in service account key at `{key_path}`"),
-                    source: source.into(),
+                    source: error.into(),
                 })?,
             None,
         );
 
-        let refresh_buffer = refresh_buffer
-            .try_into()
-            .map_err(|source| Error::Initialization {
-                reason: format!("invalid refresh_buffer `{refresh_buffer:?}`"),
-                source: Box::new(source),
-            })?;
-
         Ok(Self {
             project_url,
-            token_fetcher: TokenFetcher::new(jwt, credentials, refresh_buffer),
+            token_fetcher: TokenFetcher::new(jwt, credentials, refresh_buffer.as_secs() as i64),
             reqwest_client: reqwest::Client::new(),
         })
     }
@@ -81,7 +74,7 @@ impl PubSubClient {
     where
         R: Serialize,
     {
-        let token = self.token_fetcher.fetch_token().await.map_err(Box::new)?;
+        let token = self.token_fetcher.fetch_token().map_err(Box::new)?;
 
         let request = self
             .reqwest_client
@@ -108,51 +101,24 @@ impl Debug for PubSubClient {
 #[cfg(test)]
 mod tests {
     use super::{Error, PubSubClient};
-    use serde::Deserialize;
+    use assert_matches::assert_matches;
     use std::time::Duration;
-
-    #[derive(Debug, Deserialize, PartialEq, Eq)]
-    enum Message {
-        Foo { text: String },
-        Bar { text: String },
-    }
 
     #[test]
     fn test_new_err_non_existent_key() {
         let result = PubSubClient::new("non_existent", Duration::from_secs(30));
-        assert!(result.is_err());
-        match result.unwrap_err() {
-            Error::Initialization {
-                reason: _,
-                source: _,
-            } => (),
-            other => panic!("Expected Error::InvalidServiceAccountKey, but was `{other}`"),
-        }
+        assert_matches!(result, Err(Error::Initialization { .. }));
     }
 
     #[test]
     fn test_new_err_invalid_key() {
         let result = PubSubClient::new("Cargo.toml", Duration::from_secs(30));
-        assert!(result.is_err());
-        match result.unwrap_err() {
-            Error::Initialization {
-                reason: _,
-                source: _,
-            } => (),
-            other => panic!("Expected Error::InvalidServiceAccountKey, but was `{other}`"),
-        }
+        assert_matches!(result, Err(Error::Initialization { .. }));
     }
 
     #[test]
     fn test_new_err_invalid_private_key() {
         let result = PubSubClient::new("tests/invalid_key.json", Duration::from_secs(30));
-        assert!(result.is_err());
-        match result.unwrap_err() {
-            Error::Initialization {
-                reason: _,
-                source: _,
-            } => (),
-            other => panic!("Expected Error::InvalidPrivateKey, but was `{other}`"),
-        }
+        assert_matches!(result, Err(Error::Initialization { .. }));
     }
 }

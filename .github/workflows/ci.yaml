@@ -1,48 +1,141 @@
-name: ci
+name: CI
+
+permissions:
+  contents: read
 
 on:
-  push:
-    branches:
-      - main
-    tags-ignore:
-      - v*
-
   pull_request:
     branches:
       - main
+  workflow_dispatch:
+
+concurrency:
+  group: ${{github.workflow}}-${{github.head_ref || github.run_id}}
+  cancel-in-progress: true
 
 jobs:
-  ci:
+  toolchain:
+    name: Setup Rust toolchain
+    runs-on: ubuntu-latest
+    outputs:
+      toolchain: ${{steps.set_toolchain.outputs.toolchain}}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Output toolchain
+        id: set_toolchain
+        env:
+          toolchain_toml: "rust-toolchain.toml"
+        run: |
+          toolchain=$(grep channel rust-toolchain.toml | sed -r 's/channel = "(.*)"/\1/')
+          echo "toolchain=$toolchain" | tee -a "$GITHUB_OUTPUT"
+
+  fmt-check:
+    name: Check Code Format
     runs-on: ubuntu-latest
     steps:
-      - name: Check out
-        uses: actions/checkout@v3
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
-      # Nightly needed for `cargo +nightly fmt` below
-      - name: Install Rust toolchain
-        run: |
-          rustup update
-          rustup toolchain install nightly --profile minimal
-          rustup component add rustfmt --toolchain nightly
-          # rustup component add clippy --toolchain nightly
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@3c5f7ea28cd621ae0bf5283f0e981fb97b8a7af9
+        with:
+          toolchain: nightly-2025-12-08
+          components: rustfmt
 
       - name: Install just
-        uses: taiki-e/install-action@v2
+        uses: taiki-e/install-action@b8be7f5e140177087325943c4a8e169d01c59b3d # v2.75.3
         with:
           tool: just
 
-      - name: Set up Rust cache
-        uses: Swatinem/rust-cache@v2
+      - name: Setup Rust cache
+        uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
 
-      - name: Check code format
-        run: just fmt_check
-
-      - name: Run linter
-        run: just lint
-
-      - name: Run tests
-        env:
-          GCP_SERVICE_ACCOUNT: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+      - name: just fmt-check
         run: |
-          printenv GCP_SERVICE_ACCOUNT > secrets/active-road-365118-0214022979ee.json
+          just fmt-check
+
+  lint:
+    runs-on: ubuntu-latest
+    name: Lint Code
+    needs: toolchain
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@3c5f7ea28cd621ae0bf5283f0e981fb97b8a7af9
+        with:
+          toolchain: ${{needs.toolchain.outputs.toolchain}}
+          components: clippy
+
+      - name: Install just
+        uses: taiki-e/install-action@b8be7f5e140177087325943c4a8e169d01c59b3d # v2.75.3
+        with:
+          tool: just
+
+      - name: Setup Rust cache
+        uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
+
+      - name: just lint
+        run: |
+          rustup override set ${{needs.toolchain.outputs.toolchain}}
+          just lint
+
+  test:
+    runs-on: ubuntu-latest
+    name: Run Tests
+    needs: toolchain
+    env:
+      GCP_SERVICE_ACCOUNT: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@3c5f7ea28cd621ae0bf5283f0e981fb97b8a7af9
+        with:
+          toolchain: ${{needs.toolchain.outputs.toolchain}}
+
+      - name: Install just
+        uses: taiki-e/install-action@b8be7f5e140177087325943c4a8e169d01c59b3d # v2.75.3
+        with:
+          tool: just
+
+      - name: Setup Rust cache
+        uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
+
+      - name: just test
+        run: |
+          dir="$(mktemp -d)"
+          echo "$GCP_SERVICE_ACCOUNT" > "$dir/service-account.json"
+          export SERVICE_ACCOUNT_PATH="$dir/service-account.json"
+          rustup override set ${{needs.toolchain.outputs.toolchain}}
           just test
+
+  doc:
+    runs-on: ubuntu-latest
+    name: Create Documentation
+    needs: toolchain
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@3c5f7ea28cd621ae0bf5283f0e981fb97b8a7af9
+        with:
+          toolchain: ${{needs.toolchain.outputs.toolchain}}
+          components: rust-docs
+
+      - name: Install just
+        uses: taiki-e/install-action@b8be7f5e140177087325943c4a8e169d01c59b3d # v2.75.3
+        with:
+          tool: just
+
+      - name: Setup Rust cache
+        uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
+
+      - name: just doc
+        run: |
+          just doc
