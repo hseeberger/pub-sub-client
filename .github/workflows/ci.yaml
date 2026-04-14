@@ -14,26 +14,28 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  toolchain:
-    name: Setup Rust toolchain
+  setup-toolchain:
+    name: Setup Toolchain
     runs-on: ubuntu-latest
     outputs:
-      toolchain: ${{steps.set_toolchain.outputs.toolchain}}
+      stable: ${{steps.setup-toolchain.outputs.stable}}
+      nightly: ${{steps.setup-toolchain.outputs.nightly}}
     steps:
       - name: Checkout repository
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
       - name: Output toolchain
-        id: set_toolchain
-        env:
-          toolchain_toml: "rust-toolchain.toml"
+        id: setup-toolchain
         run: |
-          toolchain=$(grep channel rust-toolchain.toml | sed -r 's/channel = "(.*)"/\1/')
-          echo "toolchain=$toolchain" | tee -a "$GITHUB_OUTPUT"
+          stable=$(grep channel rust-toolchain.toml | sed -r 's/channel = "(.*)"/\1/')
+          echo "stable=$stable" | tee -a "$GITHUB_OUTPUT"
+          nightly=$(grep nightly rust-toolchain.toml | sed -r 's/# nightly = "(.*)"/\1/')
+          echo "nightly=$nightly" | tee -a "$GITHUB_OUTPUT"
 
   fmt-check:
     name: Check Code Format
     runs-on: ubuntu-latest
+    needs: setup-toolchain
     steps:
       - name: Checkout repository
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -41,7 +43,7 @@ jobs:
       - name: Install Rust
         uses: dtolnay/rust-toolchain@3c5f7ea28cd621ae0bf5283f0e981fb97b8a7af9
         with:
-          toolchain: nightly-2025-12-08
+          toolchain: ${{needs.setup-toolchain.outputs.nightly}}
           components: rustfmt
 
       - name: Install just
@@ -57,9 +59,9 @@ jobs:
           just fmt-check
 
   lint:
-    runs-on: ubuntu-latest
     name: Lint Code
-    needs: toolchain
+    runs-on: ubuntu-latest
+    needs: setup-toolchain
     steps:
       - name: Checkout repository
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -67,7 +69,7 @@ jobs:
       - name: Install Rust
         uses: dtolnay/rust-toolchain@3c5f7ea28cd621ae0bf5283f0e981fb97b8a7af9
         with:
-          toolchain: ${{needs.toolchain.outputs.toolchain}}
+          toolchain: ${{needs.setup-toolchain.outputs.stable}}
           components: clippy
 
       - name: Install just
@@ -80,13 +82,13 @@ jobs:
 
       - name: just lint
         run: |
-          rustup override set ${{needs.toolchain.outputs.toolchain}}
+          rustup override set ${{needs.setup-toolchain.outputs.stable}}
           just lint
 
   test:
-    runs-on: ubuntu-latest
     name: Run Tests
-    needs: toolchain
+    runs-on: ubuntu-latest
+    needs: setup-toolchain
     env:
       GCP_SERVICE_ACCOUNT: ${{ secrets.GCP_SERVICE_ACCOUNT }}
     steps:
@@ -96,7 +98,7 @@ jobs:
       - name: Install Rust
         uses: dtolnay/rust-toolchain@3c5f7ea28cd621ae0bf5283f0e981fb97b8a7af9
         with:
-          toolchain: ${{needs.toolchain.outputs.toolchain}}
+          toolchain: ${{needs.setup-toolchain.outputs.stable}}
 
       - name: Install just
         uses: taiki-e/install-action@b8be7f5e140177087325943c4a8e169d01c59b3d # v2.75.3
@@ -111,13 +113,13 @@ jobs:
           dir="$(mktemp -d)"
           echo "$GCP_SERVICE_ACCOUNT" > "$dir/service-account.json"
           export SERVICE_ACCOUNT_PATH="$dir/service-account.json"
-          rustup override set ${{needs.toolchain.outputs.toolchain}}
+          rustup override set ${{needs.setup-toolchain.outputs.stable}}
           just test
 
   doc:
-    runs-on: ubuntu-latest
     name: Create Documentation
-    needs: toolchain
+    runs-on: ubuntu-latest
+    needs: setup-toolchain
     steps:
       - name: Checkout repository
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -125,7 +127,7 @@ jobs:
       - name: Install Rust
         uses: dtolnay/rust-toolchain@3c5f7ea28cd621ae0bf5283f0e981fb97b8a7af9
         with:
-          toolchain: ${{needs.toolchain.outputs.toolchain}}
+          toolchain: ${{needs.setup-toolchain.outputs.stable}}
           components: rust-docs
 
       - name: Install just
@@ -138,4 +140,5 @@ jobs:
 
       - name: just doc
         run: |
+          rustup override set ${{needs.setup-toolchain.outputs.stable}}
           just doc

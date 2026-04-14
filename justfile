@@ -1,7 +1,6 @@
 set shell := ["bash", "-uc"]
 
-rust_version := `grep channel rust-toolchain.toml | sed -r 's/channel = "(.*)"/\1/'`
-nightly := "nightly-2026-03-05"
+nightly := `grep nightly rust-toolchain.toml | sed -r 's/# nightly = "(.*)"/\1/'`
 
 check:
 	cargo check --tests
