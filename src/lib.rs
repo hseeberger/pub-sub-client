@@ -34,7 +34,6 @@ impl PubSubClient {
                 reason: format!("missing or malformed service account key at `{key_path}`"),
                 source: error.into(),
             })?;
-        println!("{credentials:?}");
 
         let base_url = env::var(BASE_URL_ENV_VAR).unwrap_or_else(|_| DEFAULT_BASE_URL.to_string());
         let project_id = credentials.project();
