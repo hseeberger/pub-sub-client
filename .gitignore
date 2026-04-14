@@ -1,7 +1,7 @@
-Cargo.lock
+.claude
+.DS_Store
+.envrc.local
+.vscode
+.zed
 target
-/.blackbox/pubring.gpg~
-/.blackbox/pubring.kbx~
-/.blackbox/secring.gpg
-active-road-*.json
-/secrets/active-road-365118-0214022979ee.json
+

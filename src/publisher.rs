@@ -1,9 +1,14 @@
-use crate::{error::Error, PubSubClient};
-use base64::{engine::general_purpose::STANDARD, Engine};
+use crate::{PubSubClient, error::Error};
+use base64::{Engine, engine::general_purpose::STANDARD};
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, fmt::Debug, time::Duration};
 use tracing::debug;
 
+/// A domain message to be published together with optional attributes.
+///
+/// Created via the [`From`] conversions for a bare message `M` (without attributes) or a
+/// `(M, HashMap<String, String>)` tuple (with attributes), so [`PubSubClient::publish`] can be
+/// called with either.
 pub struct PublishedMessageEnvelope<M>
 where
     M: Serialize,
@@ -36,6 +41,8 @@ where
     }
 }
 
+/// A raw message to be published, i.e. with already Base64 encoded `data`, optional `attributes`
+/// and an optional `ordering_key`.
 #[derive(Debug, Default, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RawPublishedMessage<'a> {
@@ -45,6 +52,8 @@ pub struct RawPublishedMessage<'a> {
 }
 
 impl<'a> RawPublishedMessage<'a> {
+    /// Create a new `RawPublishedMessage` with the given Base64 encoded `data` and no attributes or
+    /// ordering key.
     pub fn new(data: String) -> Self {
         Self {
             data: Some(data),
@@ -53,16 +62,19 @@ impl<'a> RawPublishedMessage<'a> {
         }
     }
 
+    /// Set the Base64 encoded `data`.
     pub fn with_data(mut self, data: String) -> Self {
         self.data = Some(data);
         self
     }
 
+    /// Set the `attributes`.
     pub fn with_attributes(mut self, attributes: HashMap<String, String>) -> Self {
         self.attributes = Some(attributes);
         self
     }
 
+    /// Set the `ordering_key`.
     pub fn with_ordering_key(mut self, ordering_key: &'a str) -> Self {
         self.ordering_key = Some(ordering_key);
         self
@@ -82,6 +94,9 @@ struct PublishResponse {
 }
 
 impl PubSubClient {
+    /// Serialize the given message envelopes to JSON and publish them to the topic with the given
+    /// ID, optionally using the given `ordering_key` and request `timeout`, returning the IDs of
+    /// the published messages.
     #[tracing::instrument]
     pub async fn publish<M, E>(
         &self,
@@ -118,6 +133,8 @@ impl PubSubClient {
         self.publish_raw(topic_id, messages, timeout).await
     }
 
+    /// Publish the given raw messages to the topic with the given ID, optionally using the given
+    /// request `timeout`, returning the IDs of the published messages.
     #[tracing::instrument]
     pub async fn publish_raw(
         &self,

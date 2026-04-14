@@ -1,11 +1,13 @@
-use crate::{error::Error, PubSubClient};
-use base64::{engine::general_purpose::STANDARD, Engine};
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use crate::{PubSubClient, error::Error};
+use base64::{Engine, engine::general_purpose::STANDARD};
+use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use serde_json::Value;
 use std::{collections::HashMap, error::Error as StdError, fmt::Debug, time::Duration};
 use time::OffsetDateTime;
 use tracing::debug;
 
+/// A pulled message with its metadata. The `message` field holds either the deserialized domain
+/// message or the [`Error`] that occurred while decoding, transforming or deserializing it.
 #[derive(Debug)]
 pub struct PulledMessage<M>
 where
@@ -20,6 +22,8 @@ where
     pub delivery_attempt: u32,
 }
 
+/// A raw pulled message envelope, exposing the acknowledge ID and delivery attempt alongside the
+/// raw [`RawPulledMessage`].
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RawPulledMessageEnvelope {
@@ -29,6 +33,7 @@ pub struct RawPulledMessageEnvelope {
     pub delivery_attempt: u32,
 }
 
+/// A raw pulled message with its still Base64 encoded `data` and metadata.
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RawPulledMessage {
@@ -61,6 +66,9 @@ struct AcknowledgeRequest<'a> {
 }
 
 impl PubSubClient {
+    /// Pull at most `max_messages` messages from the subscription with the given ID, optionally
+    /// using the given request `timeout`, deserializing each JSON payload into a domain message of
+    /// type `M`.
     #[tracing::instrument]
     pub async fn pull<M>(
         &self,
@@ -75,6 +83,9 @@ impl PubSubClient {
             .await
     }
 
+    /// Like [`pull`](Self::pull), but applies the given `transform` to the raw JSON value before
+    /// deserializing it into a domain message of type `M`, which allows for adjusting the JSON
+    /// structure as well as for schema evolution.
     #[tracing::instrument(skip(transform))]
     pub async fn pull_with_transform<M, T>(
         &self,
@@ -97,6 +108,8 @@ impl PubSubClient {
         Ok(messages)
     }
 
+    /// Pull at most `max_messages` raw message envelopes from the subscription with the given ID,
+    /// optionally using the given request `timeout`, without deserializing the payloads.
     #[tracing::instrument]
     pub async fn pull_raw(
         &self,
@@ -122,6 +135,9 @@ impl PubSubClient {
         Ok(envelopes)
     }
 
+    /// Acknowledge the messages with the given ACK IDs for the subscription with the given ID,
+    /// optionally using the given request `timeout`.
+    ///
     /// According to how Google Cloud Pub/Sub works, passing at least one invalid ACK ID fails the
     /// whole request via a 400 Bad Request response.
     pub async fn acknowledge(
@@ -204,13 +220,13 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::{deserialize, RawPulledMessage, RawPulledMessageEnvelope};
+    use super::{RawPulledMessage, RawPulledMessageEnvelope, deserialize};
     use anyhow::anyhow;
-    use base64::{engine::general_purpose::STANDARD, Engine};
+    use base64::{Engine, engine::general_purpose::STANDARD};
     use serde::Deserialize;
-    use serde_json::{json, Value};
-    use std::{collections::HashMap, error::Error as StdError};
-    use time::{format_description::well_known::Rfc3339, OffsetDateTime};
+    use serde_json::{Value, json};
+    use std::{cmp::Reverse, collections::HashMap, error::Error as StdError};
+    use time::{OffsetDateTime, format_description::well_known::Rfc3339};
 
     const TIME: &str = "2022-02-20T22:02:20.123456789Z";
 
@@ -291,21 +307,23 @@ mod tests {
                         .filter(|key| **key == "type" || key.starts_with("type."))
                         .map(|key| (&key[..], key.split(".").skip(1).collect::<Vec<_>>()))
                         .collect::<Vec<_>>();
-                    type_keys.sort_unstable_by(|v1, v2| v2.1.len().cmp(&v1.1.len()));
+
+                    type_keys.sort_unstable_by_key(|(_, json_path)| Reverse(json_path.len()));
                     for (type_key, json_path) in type_keys {
-                        let sub_value = json_path
-                            .iter()
-                            .fold(Some(&mut value), |v, k| v.and_then(|v| v.get_mut(k)));
+                        let sub_value = json_path.iter().try_fold(&mut value, |v, k| v.get_mut(k));
                         if let Some(sub_value) = sub_value {
                             let tpe = attributes.get(type_key).unwrap().to_string();
                             *sub_value = json!({ tpe: sub_value });
                         }
                     }
+
                     Ok(value)
                 }
+
                 "v2" => Ok(value),
                 unknown => Err(anyhow!("Unknow version `{unknown}`").into()),
             },
+
             None => Ok(value),
         }
     }

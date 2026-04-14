@@ -1,3 +1,15 @@
+//! A [Google Cloud Pub/Sub](https://cloud.google.com/pubsub) client library.
+//!
+//! Currently publishing, pulling and acknowledging are supported, but no management tasks like
+//! creating topics or subscriptions.
+//!
+//! Messages can either be published and pulled as raw or – if the payload is JSON data – serialized
+//! from and deserialized into domain messages (structs or enums) via [Serde](https://serde.rs).
+//! When pulling, the raw JSON value can also be transformed before being deserialized, which allows
+//! for adjusting the JSON structure as well as for schema evolution.
+//!
+//! All operations are provided by [`PubSubClient`].
+
 mod error;
 mod publisher;
 mod subscriber;
@@ -19,6 +31,8 @@ use std::{
 const BASE_URL_ENV_VAR: &str = "PUB_SUB_BASE_URL";
 const DEFAULT_BASE_URL: &str = "https://pubsub.googleapis.com";
 
+/// A client for [Google Cloud Pub/Sub](https://cloud.google.com/pubsub), offering methods to
+/// publish, pull and acknowledge messages.
 pub struct PubSubClient {
     project_url: String,
     token_fetcher: TokenFetcher,
@@ -26,15 +40,17 @@ pub struct PubSubClient {
 }
 
 impl PubSubClient {
-    pub fn new<T>(key_path: T, refresh_buffer: Duration) -> Result<Self, Error>
-    where
-        T: AsRef<str>,
-    {
+    /// Create a new `PubSubClient` from the service account key file at the given path, refreshing
+    /// access tokens `refresh_buffer` before they expire.
+    ///
+    /// Fails if the key file is missing or malformed.
+    pub fn new(key_path: impl AsRef<str>, refresh_buffer: Duration) -> Result<Self, Error> {
         let key_path = key_path.as_ref();
+
         let credentials =
-            Credentials::from_file(key_path).map_err(|source| Error::Initialization {
+            Credentials::from_file(key_path).map_err(|error| Error::Initialization {
                 reason: format!("missing or malformed service account key at `{key_path}`"),
-                source: source.into(),
+                source: error.into(),
             })?;
 
         let base_url = env::var(BASE_URL_ENV_VAR).unwrap_or_else(|_| DEFAULT_BASE_URL.to_string());
@@ -44,30 +60,23 @@ impl PubSubClient {
         let jwt = Jwt::new(
             JwtClaims::new(
                 credentials.iss(),
-                &Scope::PubSub,
+                &[Scope::PubSub],
                 credentials.token_uri(),
                 None,
                 None,
             ),
             credentials
                 .rsa_key()
-                .map_err(|source| Error::Initialization {
+                .map_err(|error| Error::Initialization {
                     reason: format!("malformed private key in service account key at `{key_path}`"),
-                    source: source.into(),
+                    source: error.into(),
                 })?,
             None,
         );
 
-        let refresh_buffer = refresh_buffer
-            .try_into()
-            .map_err(|source| Error::Initialization {
-                reason: format!("invalid refresh_buffer `{refresh_buffer:?}`"),
-                source: Box::new(source),
-            })?;
-
         Ok(Self {
             project_url,
-            token_fetcher: TokenFetcher::new(jwt, credentials, refresh_buffer),
+            token_fetcher: TokenFetcher::new(jwt, credentials, refresh_buffer.as_secs() as i64),
             reqwest_client: reqwest::Client::new(),
         })
     }
@@ -81,7 +90,7 @@ impl PubSubClient {
     where
         R: Serialize,
     {
-        let token = self.token_fetcher.fetch_token().await.map_err(Box::new)?;
+        let token = self.token_fetcher.fetch_token().map_err(Box::new)?;
 
         let request = self
             .reqwest_client
@@ -108,51 +117,24 @@ impl Debug for PubSubClient {
 #[cfg(test)]
 mod tests {
     use super::{Error, PubSubClient};
-    use serde::Deserialize;
+    use assert_matches::assert_matches;
     use std::time::Duration;
-
-    #[derive(Debug, Deserialize, PartialEq, Eq)]
-    enum Message {
-        Foo { text: String },
-        Bar { text: String },
-    }
 
     #[test]
     fn test_new_err_non_existent_key() {
         let result = PubSubClient::new("non_existent", Duration::from_secs(30));
-        assert!(result.is_err());
-        match result.unwrap_err() {
-            Error::Initialization {
-                reason: _,
-                source: _,
-            } => (),
-            other => panic!("Expected Error::InvalidServiceAccountKey, but was `{other}`"),
-        }
+        assert_matches!(result, Err(Error::Initialization { .. }));
     }
 
     #[test]
     fn test_new_err_invalid_key() {
         let result = PubSubClient::new("Cargo.toml", Duration::from_secs(30));
-        assert!(result.is_err());
-        match result.unwrap_err() {
-            Error::Initialization {
-                reason: _,
-                source: _,
-            } => (),
-            other => panic!("Expected Error::InvalidServiceAccountKey, but was `{other}`"),
-        }
+        assert_matches!(result, Err(Error::Initialization { .. }));
     }
 
     #[test]
     fn test_new_err_invalid_private_key() {
         let result = PubSubClient::new("tests/invalid_key.json", Duration::from_secs(30));
-        assert!(result.is_err());
-        match result.unwrap_err() {
-            Error::Initialization {
-                reason: _,
-                source: _,
-            } => (),
-            other => panic!("Expected Error::InvalidPrivateKey, but was `{other}`"),
-        }
+        assert_matches!(result, Err(Error::Initialization { .. }));
     }
 }

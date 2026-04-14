@@ -1,18 +1,29 @@
 set shell := ["bash", "-uc"]
 
+nightly := `rustc --version | grep -oE '[0-9]{4}-[0-9]{2}-[0-9]{2}' | sed 's/^/nightly-/'`
+
 check:
 	cargo check --tests
 
-fmt:
-	cargo +nightly fmt
+fix:
+	cargo fix --tests --allow-dirty --allow-staged
 
-fmt_check:
-	cargo +nightly fmt --check
+fmt:
+    cargo +{{nightly}} fmt
+
+fmt-check:
+    cargo +{{nightly}} fmt --check
 
 lint:
-	cargo clippy --no-deps -- -D warnings
+	cargo clippy --tests --no-deps -- -D warnings
+
+lint-fix:
+	cargo clippy --tests --no-deps --allow-dirty --allow-staged --fix
 
 test:
-	cargo test
+	cargo test --tests
 
-all: fmt check lint test
+doc:
+	cargo doc --no-deps
+
+all: check fmt lint test doc

@@ -1,16 +1,17 @@
-use base64::{engine::general_purpose::STANDARD, Engine};
+use assert_matches::assert_matches;
+use base64::{Engine, engine::general_purpose::STANDARD};
 use pub_sub_client::{PubSubClient, RawPublishedMessage};
 use reqwest::{Client, StatusCode};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use std::{collections::HashMap, env, time::Duration, vec};
-use testcontainers::clients::Cli;
+use std::{collections::HashMap, env, error::Error, time::Duration, vec};
+use testcontainers::{ImageExt, runners::AsyncRunner};
 use testcontainers_modules::google_cloud_sdk_emulators::{CloudSdk, PUBSUB_PORT};
 
-const PROJECT_ID: &str = "active-road-365118";
-const TOPIC_ID: &str = "test";
-const SUBSCRIPTION_ID: &str = "test";
-const TEXT: &str = "test-text";
+const PROJECT_ID: &str = "test-493315"; // Must match the project ID of the service account key!
+const TOPIC_ID: &str = "test-topic";
+const SUBSCRIPTION_ID: &str = "test-sub";
+const TEXT: &str = "test-message";
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 enum Message {
@@ -19,11 +20,14 @@ enum Message {
 }
 
 #[tokio::test]
-async fn test() {
-    // Set up testcontainers
-    let docker_cli = Cli::default();
-    let node = docker_cli.run(CloudSdk::pubsub());
-    let pubsub_port = node.get_host_port_ipv4(PUBSUB_PORT);
+async fn test() -> Result<(), Box<dyn Error>> {
+    // Set up Pub/Sub. The `google/cloud-sdk` emulator image is only published for `linux/amd64`,
+    // so pin the platform to run it (via emulation) on other architectures too.
+    let pubsub = CloudSdk::pubsub()
+        .with_platform("linux/amd64")
+        .start()
+        .await?;
+    let pubsub_port = pubsub.get_host_port_ipv4(PUBSUB_PORT).await?;
     let base_url = format!("http://localhost:{pubsub_port}");
     let topic_name = format!("projects/{PROJECT_ID}/topics/{TOPIC_ID}");
     let subscription_name = format!("projects/{PROJECT_ID}/subscriptions/{SUBSCRIPTION_ID}");
@@ -51,26 +55,26 @@ async fn test() {
     assert_eq!(response.status(), StatusCode::OK);
 
     // Create PubSubClient
-    // Notice: GitHub Actions write the `GCP_SERVICE_ACCOUNT` secret to the below key path,
-    // locally the file must be decrypted.
-    env::set_var("PUB_SUB_BASE_URL", base_url);
-    let pub_sub_client = PubSubClient::new(
-        "secrets/active-road-365118-0214022979ee.json",
-        Duration::from_secs(30),
-    );
-    env::set_var("PUB_SUB_BASE_URL", "");
+    // Notice: GitHub Actions write the `GCP_SERVICE_ACCOUNT` secret to the key path given by the
+    // `SERVICE_ACCOUNT_PATH` env var.
+    let service_account_path = env::var("SERVICE_ACCOUNT_PATH")?;
+    unsafe {
+        env::set_var("PUB_SUB_BASE_URL", base_url);
+    }
+    let pub_sub_client = PubSubClient::new(service_account_path, Duration::from_secs(30));
+    unsafe {
+        env::set_var("PUB_SUB_BASE_URL", "");
+    }
     assert!(pub_sub_client.is_ok());
     let pub_sub_client = pub_sub_client.unwrap();
 
     // Publish raw
     let foo = STANDARD.encode(json!({ "Foo": { "text": TEXT } }).to_string());
     let messages = vec![RawPublishedMessage::new(foo)];
-    let result = pub_sub_client
+    let response = pub_sub_client
         .publish_raw(TOPIC_ID, messages, Some(Duration::from_secs(10)))
         .await;
-    assert!(result.is_ok());
-    let result = result.unwrap();
-    assert_eq!(result.len(), 1);
+    assert_matches!(response, Ok(response) if response.len() == 1);
 
     // Publish agian, typed
     let messages = vec![
@@ -224,4 +228,6 @@ async fn test() {
         result[0].attributes,
         Some(HashMap::from([("version".to_string(), "v1".to_string())]))
     );
+
+    Ok(())
 }
