@@ -1,3 +1,4 @@
+use assert_matches::assert_matches;
 use base64::{Engine, engine::general_purpose::STANDARD};
 use pub_sub_client::{PubSubClient, RawPublishedMessage};
 use reqwest::{Client, StatusCode};
@@ -65,12 +66,10 @@ async fn test() -> Result<(), Box<dyn Error>> {
     // Publish raw
     let foo = STANDARD.encode(json!({ "Foo": { "text": TEXT } }).to_string());
     let messages = vec![RawPublishedMessage::new(foo)];
-    let result = pub_sub_client
+    let response = pub_sub_client
         .publish_raw(TOPIC_ID, messages, Some(Duration::from_secs(10)))
         .await;
-    assert!(result.is_ok());
-    let result = result.unwrap();
-    assert_eq!(result.len(), 1);
+    assert_matches!(response, Ok(response) if response.len() == 1);
 
     // Publish agian, typed
     let messages = vec![

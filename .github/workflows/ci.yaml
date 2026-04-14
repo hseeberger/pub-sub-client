@@ -82,6 +82,7 @@ jobs:
 
       - name: just lint
         run: |
+          export SERVICE_ACCOUNT_PATH="dummy.json"
           rustup override set ${{needs.setup-toolchain.outputs.stable}}
           just lint
 
