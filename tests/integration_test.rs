@@ -1,14 +1,12 @@
 use assert_matches::assert_matches;
 use base64::{Engine, engine::general_purpose::STANDARD};
 use pub_sub_client::{PubSubClient, RawPublishedMessage};
-use reqwest::{Client, StatusCode};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::{collections::HashMap, env, error::Error, time::Duration, vec};
 use testcontainers::{ImageExt, runners::AsyncRunner};
 use testcontainers_modules::google_cloud_sdk_emulators::{CloudSdk, PUBSUB_PORT};
 
-const PROJECT_ID: &str = "test-493315"; // Must match the project ID of the service account key!
 const TOPIC_ID: &str = "test-topic";
 const SUBSCRIPTION_ID: &str = "test-sub";
 const TEXT: &str = "test-message";
@@ -29,32 +27,8 @@ async fn test() -> Result<(), Box<dyn Error>> {
         .await?;
     let pubsub_port = pubsub.get_host_port_ipv4(PUBSUB_PORT).await?;
     let base_url = format!("http://localhost:{pubsub_port}");
-    let topic_name = format!("projects/{PROJECT_ID}/topics/{TOPIC_ID}");
-    let subscription_name = format!("projects/{PROJECT_ID}/subscriptions/{SUBSCRIPTION_ID}");
 
-    // For management we have to interact with Pub/Sub via HTTP
-    let reqwest_client = Client::new();
-
-    // Create topic
-    let response = reqwest_client
-        .put(format!("{base_url}/v1/{topic_name}"))
-        .send()
-        .await;
-    assert!(response.is_ok());
-    let response = response.unwrap();
-    assert_eq!(response.status(), StatusCode::OK);
-
-    // Create subscription
-    let response = reqwest_client
-        .put(format!("{base_url}/v1/{subscription_name}"))
-        .json(&json!({ "topic": topic_name }))
-        .send()
-        .await;
-    assert!(response.is_ok());
-    let response = response.unwrap();
-    assert_eq!(response.status(), StatusCode::OK);
-
-    // Create PubSubClient
+    // Create PubSubClient.
     // Notice: GitHub Actions write the `GCP_SERVICE_ACCOUNT` secret to the key path given by the
     // `SERVICE_ACCOUNT_PATH` env var.
     let service_account_path = env::var("SERVICE_ACCOUNT_PATH")?;
@@ -67,6 +41,15 @@ async fn test() -> Result<(), Box<dyn Error>> {
     }
     assert!(pub_sub_client.is_ok());
     let pub_sub_client = pub_sub_client.unwrap();
+
+    // Create topic and subscription.
+    assert!(pub_sub_client.create_topic(TOPIC_ID, None).await.is_ok());
+    assert!(
+        pub_sub_client
+            .create_subscription(SUBSCRIPTION_ID, TOPIC_ID, None)
+            .await
+            .is_ok()
+    );
 
     // Publish raw
     let foo = STANDARD.encode(json!({ "Foo": { "text": TEXT } }).to_string());

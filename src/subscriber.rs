@@ -1,5 +1,6 @@
 use crate::{PubSubClient, error::Error};
 use base64::{Engine, engine::general_purpose::STANDARD};
+use reqwest::Method;
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use serde_json::Value;
 use std::{collections::HashMap, error::Error as StdError, fmt::Debug, time::Duration};
@@ -117,10 +118,11 @@ impl PubSubClient {
         max_messages: u32,
         timeout: Option<Duration>,
     ) -> Result<Vec<RawPulledMessageEnvelope>, Error> {
-        let url = self.subscription_url(subscription_id, "pull");
+        let url = format!("{}:pull", self.subscription_url(subscription_id));
         let request = PullRequest { max_messages };
-        debug!(url, "sending request");
-        let response = self.send_request(&url, &request, timeout).await?;
+        let response = self
+            .send_request(Method::POST, &url, &request, timeout)
+            .await?;
 
         if !response.status().is_success() {
             return Err(Error::unexpected_http_status_code(response).await);
@@ -132,6 +134,7 @@ impl PubSubClient {
             .map_err(Error::UnexpectedHttpResponse)?
             .envelopes;
 
+        debug!(num_messages = envelopes.len(), "successfully pulled");
         Ok(envelopes)
     }
 
@@ -140,31 +143,25 @@ impl PubSubClient {
     ///
     /// According to how Google Cloud Pub/Sub works, passing at least one invalid ACK ID fails the
     /// whole request via a 400 Bad Request response.
+    #[tracing::instrument]
     pub async fn acknowledge(
         &self,
         subscription_id: &str,
         ack_ids: Vec<&str>,
         timeout: Option<Duration>,
     ) -> Result<(), Error> {
+        let url = format!("{}:acknowledge", self.subscription_url(subscription_id));
         let request = AcknowledgeRequest { ack_ids };
         let response = self
-            .send_request(
-                &self.subscription_url(subscription_id, "acknowledge"),
-                &request,
-                timeout,
-            )
+            .send_request(Method::POST, &url, &request, timeout)
             .await?;
 
         if !response.status().is_success() {
             return Err(Error::unexpected_http_status_code(response).await);
         }
 
+        debug!("successfully acknowledged");
         Ok(())
-    }
-
-    fn subscription_url(&self, subscription_id: &str, action: &str) -> String {
-        let project_url = &self.project_url;
-        format!("{project_url}/subscriptions/{subscription_id}:{action}")
     }
 }
 
