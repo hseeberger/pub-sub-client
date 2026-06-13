@@ -3,6 +3,7 @@ use base64::{Engine, engine::general_purpose::STANDARD};
 use pub_sub_client::{
     Error, PubSubClient, PulledMessage, RawPublishedMessage, RawPulledMessageEnvelope,
 };
+use reqwest::StatusCode;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use std::{collections::HashMap, env, error::Error as _, time::Duration};
@@ -34,11 +35,18 @@ async fn main() {
 }
 
 async fn run() -> Result<(), Error> {
-    let dir = env::var("CARGO_MANIFEST_DIR").unwrap_or_else(|_| ".".to_string());
-    let key_path = format!("{dir}/secrets/active-road-365118-0214022979ee.json");
+    let key_path = env::var("SERVICE_ACCOUNT_PATH").expect("SERVICE_ACCOUNT_PATH must be set");
     let pub_sub_client = PubSubClient::new(key_path, Duration::from_secs(30))?;
 
-    let messages = vec!["Hello", "from pub-sub-client"]
+    // Create the topic and subscription, ignoring the error if they already exist.
+    ignore_already_exists(pub_sub_client.create_topic(TOPIC_ID, None).await)?;
+    ignore_already_exists(
+        pub_sub_client
+            .create_subscription(SUBSCRIPTION_ID, TOPIC_ID, None)
+            .await,
+    )?;
+
+    let messages = ["Hello", "from pub-sub-client"]
         .iter()
         .map(|s| STANDARD.encode(json!({ "text": s }).to_string()))
         .map(|data| {
@@ -115,5 +123,13 @@ fn transform(
             );
             Err(e.into())
         }
+    }
+}
+
+// Treat an "already exists" response (409 Conflict) as success, but surface any other error.
+fn ignore_already_exists(result: Result<(), Error>) -> Result<(), Error> {
+    match result {
+        Err(Error::UnexpectedHttpStatusCode(status, _)) if status == StatusCode::CONFLICT => Ok(()),
+        result => result,
     }
 }

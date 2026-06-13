@@ -14,7 +14,7 @@
 [docs-badge]: https://img.shields.io/docsrs/pub-sub-client/latest
 [docs-url]: https://docs.rs/pub-sub-client/latest/pub_sub_client/
 
-Google Cloud Pub/Sub client library in [Rust](https://www.rust-lang.org/). Currently publishing, pulling and acknowledging are supported, but no management tasks like creating topics or subscriptions.
+Google Cloud Pub/Sub client library in [Rust](https://www.rust-lang.org/). Currently publishing, pulling and acknowledging are supported, as well as creating topics and subscriptions; other management tasks (like deleting or listing) are not yet supported.
 
 Messages can either be published/pulled as raw or, if the payload is JSON data, serialized from/deserialized into domain messages (structs or enums) via [Serde](https://serde.rs/) and [Serde JSON](https://docs.rs/serde_json). Both raw `RawPulledMessageEnvelope`s and "typed" `PulledMessage`s expose metadata like message ID, acknowledge ID, attributes, etc.
 
@@ -25,6 +25,7 @@ Aside from straightforward deserialization it is also possible to first transfor
 - Publish messages as typed domain values (serialized via Serde) or as raw payloads.
 - Pull and acknowledge messages, with access to metadata like message ID, acknowledge ID, attributes, publish time, ordering key and delivery attempt.
 - Optionally transform the pulled JSON before deserialization, e.g. for schema evolution.
+- Create topics and subscriptions.
 - Support for message attributes, ordering keys and per-request timeouts.
 
 ## Installation

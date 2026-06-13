@@ -1,5 +1,6 @@
 use crate::{PubSubClient, error::Error};
 use base64::{Engine, engine::general_purpose::STANDARD};
+use reqwest::Method;
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, fmt::Debug, time::Duration};
 use tracing::debug;
@@ -142,10 +143,11 @@ impl PubSubClient {
         messages: Vec<RawPublishedMessage<'_>>,
         timeout: Option<Duration>,
     ) -> Result<Vec<String>, Error> {
-        let url = self.topic_url(topic_id);
+        let url = format!("{}:publish", self.topic_url(topic_id));
         let request = PublishRequest { messages };
-        debug!(url, "sending request");
-        let response = self.send_request(&url, &request, timeout).await?;
+        let response = self
+            .send_request(Method::POST, &url, &request, timeout)
+            .await?;
 
         if !response.status().is_success() {
             return Err(Error::unexpected_http_status_code(response).await);
@@ -158,10 +160,5 @@ impl PubSubClient {
             .message_ids;
         debug!(?message_ids, "successfully published");
         Ok(message_ids)
-    }
-
-    fn topic_url(&self, topic_id: &str) -> String {
-        let project_url = &self.project_url;
-        format!("{project_url}/topics/{topic_id}:publish")
     }
 }

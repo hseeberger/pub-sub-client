@@ -1,7 +1,7 @@
 //! A [Google Cloud Pub/Sub](https://cloud.google.com/pubsub) client library.
 //!
-//! Currently publishing, pulling and acknowledging are supported, but no management tasks like
-//! creating topics or subscriptions.
+//! Currently publishing, pulling and acknowledging are supported, as well as creating topics and
+//! subscriptions; other management tasks (like deleting or listing) are not yet supported.
 //!
 //! Messages can either be published and pulled as raw or – if the payload is JSON data – serialized
 //! from and deserialized into domain messages (structs or enums) via [Serde](https://serde.rs).
@@ -11,6 +11,7 @@
 //! All operations are provided by [`PubSubClient`].
 
 mod error;
+mod manager;
 mod publisher;
 mod subscriber;
 
@@ -19,7 +20,7 @@ pub use publisher::*;
 pub use subscriber::*;
 
 use goauth::{auth::JwtClaims, credentials::Credentials, fetcher::TokenFetcher, scopes::Scope};
-use reqwest::Response;
+use reqwest::{Method, Response};
 use serde::Serialize;
 use smpl_jwt::Jwt;
 use std::{
@@ -27,13 +28,15 @@ use std::{
     fmt::{self, Debug, Formatter},
     time::Duration,
 };
+use tracing::debug;
 
 const BASE_URL_ENV_VAR: &str = "PUB_SUB_BASE_URL";
 const DEFAULT_BASE_URL: &str = "https://pubsub.googleapis.com";
 
 /// A client for [Google Cloud Pub/Sub](https://cloud.google.com/pubsub), offering methods to
-/// publish, pull and acknowledge messages.
+/// publish, pull and acknowledge messages as well as to create topics and subscriptions.
 pub struct PubSubClient {
+    project_id: String,
     project_url: String,
     token_fetcher: TokenFetcher,
     reqwest_client: reqwest::Client,
@@ -75,6 +78,7 @@ impl PubSubClient {
         );
 
         Ok(Self {
+            project_id,
             project_url,
             token_fetcher: TokenFetcher::new(jwt, credentials, refresh_buffer.as_secs() as i64),
             reqwest_client: reqwest::Client::new(),
@@ -83,6 +87,7 @@ impl PubSubClient {
 
     async fn send_request<R>(
         &self,
+        method: Method,
         url: &str,
         request: &R,
         timeout: Option<Duration>,
@@ -90,11 +95,12 @@ impl PubSubClient {
     where
         R: Serialize,
     {
+        debug!(method = %method, url, "sending request");
         let token = self.token_fetcher.fetch_token().map_err(Box::new)?;
 
         let request = self
             .reqwest_client
-            .post(url)
+            .request(method, url)
             .bearer_auth(token.access_token())
             .json(request);
         let request = timeout.into_iter().fold(request, |r, t| r.timeout(t));
@@ -103,6 +109,16 @@ impl PubSubClient {
             .send()
             .await
             .map_err(Error::HttpServiceCommunication)
+    }
+
+    fn topic_url(&self, topic_id: &str) -> String {
+        let project_url = &self.project_url;
+        format!("{project_url}/topics/{topic_id}")
+    }
+
+    fn subscription_url(&self, subscription_id: &str) -> String {
+        let project_url = &self.project_url;
+        format!("{project_url}/subscriptions/{subscription_id}")
     }
 }
 
