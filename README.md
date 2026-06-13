@@ -3,6 +3,7 @@
 [![Crates.io][crates-badge]][crates-url]
 [![license][license-badge]][license-url]
 [![build][build-badge]][build-url]
+[![docs][docs-badge]][docs-url]
 
 [crates-badge]: https://img.shields.io/crates/v/pub-sub-client
 [crates-url]: https://crates.io/crates/pub-sub-client
@@ -10,12 +11,27 @@
 [license-url]: https://github.com/hseeberger/pub-sub-client/blob/main/LICENSE
 [build-badge]: https://img.shields.io/github/actions/workflow/status/hseeberger/pub-sub-client/ci.yaml
 [build-url]: https://github.com/hseeberger/pub-sub-client/actions/workflows/ci.yaml
+[docs-badge]: https://img.shields.io/docsrs/pub-sub-client/latest
+[docs-url]: https://docs.rs/pub-sub-client/latest/pub_sub_client/
 
 Google Cloud Pub/Sub client library in [Rust](https://www.rust-lang.org/). Currently publishing, pulling and acknowledging are supported, but no management tasks like creating topics or subscriptions.
 
 Messages can either be published/pulled as raw or, if the payload is JSON data, serialized from/deserialized into domain messages (structs or enums) via [Serde](https://serde.rs/) and [Serde JSON](https://docs.rs/serde_json). Both raw `RawPulledMessageEnvelope`s and "typed" `PulledMessage`s expose metadata like message ID, acknowledge ID, attributes, etc.
 
 Aside from straightforward deserialization it is also possible to first transform the pulled JSON values before deserializing into domain messages which allows for generally adjusting the JSON structure as well as schema evolution.
+
+## Features
+
+- Publish messages as typed domain values (serialized via Serde) or as raw payloads.
+- Pull and acknowledge messages, with access to metadata like message ID, acknowledge ID, attributes, publish time, ordering key and delivery attempt.
+- Optionally transform the pulled JSON before deserialization, e.g. for schema evolution.
+- Support for message attributes, ordering keys and per-request timeouts.
+
+## Installation
+
+``` shell
+cargo add pub-sub-client
+```
 
 ## Usage
 
@@ -83,6 +99,12 @@ for pulled_message in pulled_messages {
 ```
 
 For successfully deserialized messages we call `acknowledge` with the acknowledge ID taken from the envelope.
+
+### Raw messages and transformations
+
+The walkthrough above uses typed domain messages, but messages can also be published and pulled raw via `publish_raw` and `pull_raw`, giving direct access to the Base64 encoded payload and all metadata. When pulling, `pull_with_transform` lets you adjust the raw JSON value before it is deserialized into a domain message, which is handy for schema evolution.
+
+See the [`examples`](examples) directory for complete programs: [`simple`](examples/simple.rs) for typed publishing and pulling and [`transform`](examples/transform.rs) for transformations.
 
 ## Contribution policy ##
 
