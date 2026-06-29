@@ -39,9 +39,10 @@ async fn run() -> Result<(), Error> {
     )?;
 
     let messages = ["Hello", "from pub-sub-client"]
-        .iter()
-        .map(|s| s.to_string())
-        .map(|text| Message { text })
+        .into_iter()
+        .map(|text| Message {
+            text: text.to_string(),
+        })
         .collect::<Vec<_>>();
     let message_ids = pub_sub_client
         .publish(TOPIC_ID, messages, None, None)
