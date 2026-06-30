@@ -14,11 +14,15 @@
 [docs-badge]: https://img.shields.io/docsrs/pub-sub-client/latest
 [docs-url]: https://docs.rs/pub-sub-client/latest/pub_sub_client/
 
-Google Cloud Pub/Sub client library in [Rust](https://www.rust-lang.org/). Currently publishing, pulling and acknowledging are supported, as well as creating topics and subscriptions; other management tasks (like deleting or listing) are not yet supported.
+A [Google Cloud Pub/Sub](https://cloud.google.com/pubsub) client library for
+[Rust](https://www.rust-lang.org/). It supports publishing, pulling and
+acknowledging messages, as well as creating topics and subscriptions; other
+management tasks (like deleting or listing) are not yet supported.
 
-Messages can either be published/pulled as raw or, if the payload is JSON data, serialized from/deserialized into domain messages (structs or enums) via [Serde](https://serde.rs/) and [Serde JSON](https://docs.rs/serde_json). Both raw `RawPulledMessageEnvelope`s and "typed" `PulledMessage`s expose metadata like message ID, acknowledge ID, attributes, etc.
-
-Aside from straightforward deserialization it is also possible to first transform the pulled JSON values before deserializing into domain messages which allows for generally adjusting the JSON structure as well as schema evolution.
+Messages can be published and pulled as raw payloads or – when the payload is
+JSON – serialized from and deserialized into domain messages (structs or enums)
+via [Serde](https://serde.rs/). When pulling, the raw JSON can optionally be
+transformed before deserialization, which is handy for schema evolution.
 
 ## Features
 
@@ -36,78 +40,95 @@ cargo add pub-sub-client
 
 ## Usage
 
-Typically we want to use domain message:
+All operations are provided by `PubSubClient`. The example below publishes a few
+typed messages and then pulls and acknowledges them:
 
 ``` rust
+use pub_sub_client::{Error, PubSubClient};
+use serde::{Deserialize, Serialize};
+use std::time::Duration;
+
+const TOPIC_ID: &str = "test";
+const SUBSCRIPTION_ID: &str = "test";
+
 #[derive(Debug, Serialize, Deserialize)]
 struct Message {
     text: String,
 }
-```
 
-To publish `Message` we need to derive `Serialize` and to pull it we need to derive `Deserialize`.
+async fn run() -> Result<(), Error> {
+    // Create a client from a service account key file, refreshing access tokens
+    // 30s before they expire. Fails if the key file is missing or malformed.
+    let pub_sub_client = PubSubClient::new(
+        "secrets/service-account.json",
+        Duration::from_secs(30),
+    )?;
 
-First create a `PubSubClient`, giving the path to a service account key file and the duration to refresh access tokens before they expire:
+    // Publish some messages, getting back their IDs.
+    let messages = ["Hello", "from pub-sub-client"]
+        .into_iter()
+        .map(|text| Message { text: text.to_string() })
+        .collect::<Vec<_>>();
+    let message_ids = pub_sub_client
+        .publish(TOPIC_ID, messages, None, None)
+        .await?;
+    println!("published messages with IDs: {}", message_ids.join(", "));
 
-``` rust
-let pub_sub_client = PubSubClient::new(
-    "secrets/cryptic-hawk-336616-e228f9680cbc.json",
-    Duration::from_secs(30),
-)?;
-```
+    // Pull at most 42 messages, deserializing each into a `Message`.
+    let pulled_messages = pub_sub_client
+        .pull::<Message>(SUBSCRIPTION_ID, 42, None)
+        .await?;
 
-Things could go wrong, e.g. if the service account key file does not exist or is malformed, hence a `Result` is returned.
-
-Then we call `publish` to publish some `messages` using the given `TOPIC_ID` and – if all is good – get back the message IDs; we do not use an ordering key nor a request timeout here and below for simplicity:
-
-``` rust
-let messages = vec!["Hello", "from pub-sub-client"]
-    .iter()
-    .map(|s| s.to_string())
-    .map(|text| Message { text })
-    .collect::<Vec<_>>();
-let message_ids = pub_sub_client
-    .publish(TOPIC_ID, messages, None, None)
-    .await?;
-let message_ids = message_ids.join(", ");
-println!("Published messages with IDs: {message_ids}");
-```
-
-Next we call `pull` to get at most the given `42` messages from the given `SUBSCRIPTION_ID`:
-
-``` rust
-let pulled_messages = pub_sub_client
-    .pull::<Message>(SUBSCRIPTION_ID, 42, None)
-    .await?;
-```
-
-Of course pulling which happens via HTTP could fail, hence we get back another `Result`.
-
-Finally we handle the pulled messages; for simplicity we only deal with the happy path here, i.e. when the deserialization was successful:
-
-``` rust
-for pulled_message in pulled_messages {
-    match pulled_message.message {
-        Ok(m) => println!("Pulled message with text \"{}\"", m.text),
-        Err(e) => eprintln!("ERROR: {e}"),
+    for pulled_message in pulled_messages {
+        match pulled_message.message {
+            Ok(m) => println!("pulled message with text \"{}\"", m.text),
+            Err(e) => eprintln!("ERROR: {e}"),
+        }
+        pub_sub_client
+            .acknowledge(SUBSCRIPTION_ID, vec![&pulled_message.ack_id], None)
+            .await?;
+        println!("acknowledged message with ID {}", pulled_message.id);
     }
 
-    pub_sub_client
-        .acknowledge(SUBSCRIPTION_ID, vec![&pulled_message.ack_id], None)
-        .await?;
-    println!("Acknowledged message with ID {}", pulled_message.id);
+    Ok(())
 }
 ```
 
-For successfully deserialized messages we call `acknowledge` with the acknowledge ID taken from the envelope.
+Notes:
+
+- `PubSubClient::new` takes the path to a service account key file and a token
+  refresh buffer, and returns a `Result` (it fails if the key is missing or
+  malformed).
+- `publish` and `pull` accept an optional ordering key and per-request timeout
+  (both `None` above for brevity).
+- Each `PulledMessage.message` is itself a `Result`, since decoding or
+  deserializing an individual message may fail; acknowledge it via its
+  `ack_id`.
 
 ### Raw messages and transformations
 
-The walkthrough above uses typed domain messages, but messages can also be published and pulled raw via `publish_raw` and `pull_raw`, giving direct access to the Base64 encoded payload and all metadata. When pulling, `pull_with_transform` lets you adjust the raw JSON value before it is deserialized into a domain message, which is handy for schema evolution.
+Messages can also be published and pulled raw via `publish_raw` and `pull_raw`,
+giving direct access to the Base64 encoded payload and all metadata. When
+pulling, `pull_with_transform` lets you adjust the raw JSON value before it is
+deserialized into a domain message, which is useful for schema evolution. See
+[`examples/transform.rs`](examples/transform.rs).
 
-See the [`examples`](examples) directory for complete programs: [`simple`](examples/simple.rs) for typed publishing and pulling and [`transform`](examples/transform.rs) for transformations.
+### Examples and local testing
 
-## Contribution policy ##
+The [`examples`](examples) directory contains complete programs:
+[`simple`](examples/simple.rs) for typed publishing and pulling and
+[`transform`](examples/transform.rs) for transformations. They read the service
+account key path from the `SERVICE_ACCOUNT_PATH` environment variable:
+
+``` shell
+SERVICE_ACCOUNT_PATH=secrets/service-account.json cargo run --example simple
+```
+
+By default the client talks to `https://pubsub.googleapis.com`. Set the
+`PUB_SUB_BASE_URL` environment variable to point it at a different endpoint,
+such as a local [Pub/Sub emulator](https://cloud.google.com/pubsub/docs/emulator).
+
+## Contribution policy
 
 Contributions via GitHub pull requests are gladly accepted from their original author. Along with
 any pull requests, please state that the contribution is your original work and that you license the
@@ -116,8 +137,7 @@ explicitly, by submitting any copyrighted material via pull request, email, or o
 to license the material under the project's open source license and warrant that you have the legal
 authority to do so.
 
-## License ##
+## License
 
 This code is open source software licensed under the
 [Apache 2.0 License](http://www.apache.org/licenses/LICENSE-2.0.html).
-
