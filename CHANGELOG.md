@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.13.2](https://github.com/hseeberger/pub-sub-client/compare/v0.13.1...v0.13.2) - 2026-06-30
+
+### Other
+
+- *(deps)* bump quinn-proto and anyhow to patch RUSTSEC advisories
+- tighten README
+
 ## [0.13.1](https://github.com/hseeberger/pub-sub-client/compare/v0.13.0...v0.13.1) - 2026-06-13
 
 ### Added
