@@ -1,20 +1,20 @@
 [package]
-name          = "pub-sub-client"
-version       = "0.13.2"
-edition       = "2024"
-description   = "Google Cloud Pub/Sub client library"
-authors       = [ "Heiko Seeberger <git@heikoseeberger.de>" ]
-license       = "Apache-2.0"
-readme        = "README.md"
-homepage      = "https://github.com/hseeberger/pub-sub-client"
-repository    = "https://github.com/hseeberger/pub-sub-client"
-documentation = "https://github.com/hseeberger/pub-sub-client"
-include       = [
+name = "pub-sub-client"
+description = "Google Cloud Pub/Sub client library"
+version = "0.13.2"
+edition = "2024"
+license = "Apache-2.0"
+readme = "README.md"
+homepage = "https://github.com/hseeberger/pub-sub-client"
+repository = "https://github.com/hseeberger/pub-sub-client"
+documentation = "https://docs.rs/pub-sub-client/latest/pub_sub_client/"
+include = [
     "src/**/*.rs",
     "Cargo.toml",
     "LICENSE",
     "README.md",
 ]
+publish = true
 
 [dependencies]
 base64     = { version = "0.22" }
