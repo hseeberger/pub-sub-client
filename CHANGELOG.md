@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.13.3](https://github.com/hseeberger/pub-sub-client/compare/v0.13.2...v0.13.3) - 2026-07-10
+
+### Other
+
+- *(deps)* bump time from 0.3.52 to 0.3.53 in the cargo-patches group
+- *(deps)* bump time from 0.3.51 to 0.3.52 in the cargo-patches group
+- standardize project scaffolding and package metadata
+
 ## [0.13.2](https://github.com/hseeberger/pub-sub-client/compare/v0.13.1...v0.13.2) - 2026-06-30
 
 ### Other
