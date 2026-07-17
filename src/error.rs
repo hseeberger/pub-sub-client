@@ -10,7 +10,9 @@ pub enum Error {
     /// malformed.
     #[error("initialization error: {reason}")]
     Initialization {
+        /// Human-readable reason for the failure.
         reason: String,
+        /// The underlying error that caused the failure.
         source: Box<dyn StdError + Send + Sync + 'static>,
     },
 

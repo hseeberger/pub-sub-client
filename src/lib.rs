@@ -10,6 +10,8 @@
 //!
 //! All operations are provided by [`PubSubClient`].
 
+#![warn(missing_docs)]
+
 mod error;
 mod manager;
 mod publisher;

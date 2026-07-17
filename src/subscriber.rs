@@ -14,12 +14,19 @@ pub struct PulledMessage<M>
 where
     M: DeserializeOwned,
 {
+    /// ID used to acknowledge the message.
     pub ack_id: String,
+    /// The deserialized domain message, or the [`Error`] that occurred while decoding it.
     pub message: Result<M, Error>,
+    /// Optional attributes attached to the message.
     pub attributes: Option<HashMap<String, String>>,
+    /// Unique ID assigned to the message by Pub/Sub.
     pub id: String,
+    /// Time at which the message was published.
     pub publish_time: OffsetDateTime,
+    /// Key by which Pub/Sub orders messages, if any.
     pub ordering_key: Option<String>,
+    /// Number of times delivery of the message has been attempted.
     pub delivery_attempt: u32,
 }
 
@@ -28,8 +35,11 @@ where
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RawPulledMessageEnvelope {
+    /// ID used to acknowledge the message.
     pub ack_id: String,
+    /// The raw pulled message.
     pub message: RawPulledMessage,
+    /// Number of times delivery of the message has been attempted.
     #[serde(default)] // The Pub/Sub emulator does not send this field!
     pub delivery_attempt: u32,
 }
@@ -38,12 +48,17 @@ pub struct RawPulledMessageEnvelope {
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RawPulledMessage {
+    /// The still Base64 encoded message data.
     pub data: Option<String>,
+    /// Optional attributes attached to the message.
     pub attributes: Option<HashMap<String, String>>,
+    /// Unique ID assigned to the message by Pub/Sub.
     #[serde(rename = "messageId")]
     pub id: String,
+    /// Time at which the message was published.
     #[serde(with = "time::serde::rfc3339")]
     pub publish_time: OffsetDateTime,
+    /// Key by which Pub/Sub orders messages, if any.
     pub ordering_key: Option<String>,
 }
 
