@@ -47,8 +47,11 @@ where
 #[derive(Debug, Default, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RawPublishedMessage<'a> {
+    /// The already Base64 encoded message data.
     pub data: Option<String>,
+    /// Optional attributes attached to the message.
     pub attributes: Option<HashMap<String, String>>,
+    /// Optional key by which Pub/Sub orders messages.
     pub ordering_key: Option<&'a str>,
 }
 
