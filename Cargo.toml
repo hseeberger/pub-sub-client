@@ -17,7 +17,7 @@ include = [
 publish = true
 
 [dependencies]
-base64     = { version = "0.22" }
+base64     = { version = "0.23" }
 goauth     = { version = "0.17" }
 reqwest    = { version = "0.13", features = [ "json" ] }
 serde      = { version = "1.0", features = [ "derive" ] }
