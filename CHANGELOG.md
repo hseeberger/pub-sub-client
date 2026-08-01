@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.13.4](https://github.com/hseeberger/pub-sub-client/compare/v0.13.3...v0.13.4) - 2026-08-01
+
+### Other
+
+- *(deps)* bump base64 in the cargo-major group across 1 directory
+- *(deps)* bump the cargo-patch group with 6 updates
+- *(deps)* bump tokio in the cargo-minor group across 1 directory
+- turn on warnings for missing docs
+
 ## [0.13.3](https://github.com/hseeberger/pub-sub-client/compare/v0.13.2...v0.13.3) - 2026-07-16
 
 ### Other
