@@ -19,10 +19,10 @@ enum Message {
 
 #[tokio::test]
 async fn test() -> Result<(), Box<dyn Error>> {
-    // Set up Pub/Sub. The `google/cloud-sdk` emulator image is only published for `linux/amd64`,
-    // so pin the platform to run it (via emulation) on other architectures too.
+    // Set up Pub/Sub.
     let pubsub = CloudSdk::pubsub()
-        .with_platform("linux/amd64")
+        .with_name("gcr.io/google.com/cloudsdktool/google-cloud-cli")
+        .with_tag("578.0.0-emulators")
         .start()
         .await?;
     let pubsub_port = pubsub.get_host_port_ipv4(PUBSUB_PORT).await?;
