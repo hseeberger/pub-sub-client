@@ -1,0 +1,14 @@
+services:
+  pubsub:
+    image: gcr.io/google.com/cloudsdktool/google-cloud-cli:578.0.0-emulators
+    command:
+      - gcloud
+      - beta
+      - emulators
+      - pubsub
+      - start
+      - --host-port
+      - 0.0.0.0:8085
+    ports:
+      - 8085:8085
+    restart: unless-stopped
