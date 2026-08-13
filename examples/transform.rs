@@ -7,6 +7,7 @@ use reqwest::StatusCode;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use std::{collections::HashMap, env, error::Error as _, time::Duration};
+use tracing_subscriber::{EnvFilter, layer::SubscriberExt, util::SubscriberInitExt};
 
 const TOPIC_ID: &str = "test";
 const SUBSCRIPTION_ID: &str = "test";
@@ -21,9 +22,9 @@ enum Message {
 
 #[tokio::main]
 async fn main() {
-    tracing_subscriber::fmt()
-        .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
-        .json()
+    tracing_subscriber::registry()
+        .with(EnvFilter::from_default_env())
+        .with(tracing_subscriber::fmt::layer().json().flatten_event(true))
         .init();
 
     if let Err(e) = run().await {
