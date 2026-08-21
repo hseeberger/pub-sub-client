@@ -1,15 +1,18 @@
 use assert_matches::assert_matches;
 use base64::{Engine, engine::general_purpose::STANDARD};
+use composed::{Compose, compose};
 use pub_sub_client::{PubSubClient, RawPublishedMessage};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use std::{collections::HashMap, env, error::Error, time::Duration, vec};
+use std::{collections::HashMap, env, error::Error, sync::LazyLock, time::Duration, vec};
 use testcontainers::{ImageExt, runners::AsyncRunner};
 use testcontainers_modules::google_cloud_sdk_emulators::{CloudSdk, PUBSUB_PORT};
 
 const TOPIC_ID: &str = "test-topic";
 const SUBSCRIPTION_ID: &str = "test-sub";
 const TEXT: &str = "test-message";
+
+static COMPOSE: LazyLock<Compose> = LazyLock::new(|| compose!("docker-compose.yaml"));
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 enum Message {
@@ -20,7 +23,7 @@ enum Message {
 #[tokio::test]
 async fn test() -> Result<(), Box<dyn Error>> {
     // Set up Pub/Sub.
-    let (name, tag) = compose_image("pubsub");
+    let (name, tag) = COMPOSE.image("pubsub").name_and_tag();
     let pubsub = CloudSdk::pubsub()
         .with_name(name)
         .with_tag(tag)
@@ -214,20 +217,4 @@ async fn test() -> Result<(), Box<dyn Error>> {
     );
 
     Ok(())
-}
-
-fn compose_image(service: &str) -> (&'static str, &'static str) {
-    const COMPOSE: &str = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/docker-compose.yaml"));
-
-    let header = format!("  {service}:");
-
-    COMPOSE
-        .lines()
-        .skip_while(|line| line.trim_end() != header)
-        .skip(1)
-        .take_while(|line| line.starts_with("    "))
-        .find_map(|line| line.trim().strip_prefix("image:"))
-        .map(|image| image.trim().trim_matches('"'))
-        .and_then(|image| image.rsplit_once(':'))
-        .unwrap_or_else(|| panic!("no image for service {service} in docker-compose.yaml"))
 }
