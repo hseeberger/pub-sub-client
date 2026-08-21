@@ -30,6 +30,7 @@ tracing    = { version = "0.1" }
 [dev-dependencies]
 anyhow                 = { version = "1.0" }
 assert_matches         = { version = "1.5" }
+composed               = { version = "0.1" }
 testcontainers         = { version = "0.27" }
 testcontainers-modules = { version = "0.15", features = [ "google_cloud_sdk_emulators" ] }
 tokio                  = { version = "1", features = [ "macros", "rt-multi-thread" ] }
