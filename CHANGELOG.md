@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.13.6](https://github.com/hseeberger/pub-sub-client/compare/v0.13.5...v0.13.6) - 2026-10-21
+
+### Fixed
+
+- *(deps)* update rustls-webpki and webpki roots for RUSTSEC
+
+### Other
+
+- *(deps)* bump tokio
+- shrink dev build output via debug profile settings
+
 ## [0.13.5](https://github.com/hseeberger/pub-sub-client/compare/v0.13.4...v0.13.5) - 2026-09-19
 
 ### Fixed
