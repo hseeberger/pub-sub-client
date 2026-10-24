@@ -1,6 +1,6 @@
 services:
   pubsub:
-    image: gcr.io/google.com/cloudsdktool/google-cloud-cli:589.0.0-emulators
+    image: gcr.io/google.com/cloudsdktool/google-cloud-cli:590.0.1-emulators
     command:
       - gcloud
       - beta
