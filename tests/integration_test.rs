@@ -23,10 +23,10 @@ enum Message {
 #[tokio::test]
 async fn test() -> Result<(), Box<dyn Error>> {
     // Set up Pub/Sub.
-    let (name, tag) = COMPOSE.image("pubsub").name_and_tag();
+    let image = COMPOSE.image("pubsub");
     let pubsub = CloudSdk::pubsub()
-        .with_name(name)
-        .with_tag(tag)
+        .with_name(image.name())
+        .with_tag(image.tag_with_digest())
         .start()
         .await?;
     let pubsub_port = pubsub.get_host_port_ipv4(PUBSUB_PORT).await?;
