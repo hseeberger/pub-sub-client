@@ -12,7 +12,7 @@ const TOPIC_ID: &str = "test-topic";
 const SUBSCRIPTION_ID: &str = "test-sub";
 const TEXT: &str = "test-message";
 
-static COMPOSE: LazyLock<Compose> = LazyLock::new(|| compose!("docker-compose.yaml"));
+static COMPOSE: LazyLock<Compose> = LazyLock::new(|| compose!("compose.yaml"));
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 enum Message {
