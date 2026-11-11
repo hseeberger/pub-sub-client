@@ -1,0 +1,7 @@
+# Advisories cargo-audit ignores, each with the reason it does not apply to this workspace.
+[advisories]
+ignore = [
+    # astral-tokio-tar is unmaintained and only reaches the tests through testcontainers, which
+    # still depends on it in every release.
+    "RUSTSEC-2026-0440",
+]
