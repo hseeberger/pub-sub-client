@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.13.7](https://github.com/hseeberger/pub-sub-client/compare/v0.13.6...v0.13.7) - 2026-11-12
+
+### Other
+
+- *(deps)* bump Rust to 1.100.0
+
 ## [0.13.6](https://github.com/hseeberger/pub-sub-client/compare/v0.13.5...v0.13.6) - 2026-10-21
 
 ### Fixed
