@@ -5,7 +5,6 @@ version = "0.13.6"
 edition = "2024"
 license = "Apache-2.0"
 readme = "README.md"
-homepage = "https://github.com/hseeberger/pub-sub-client"
 repository = "https://github.com/hseeberger/pub-sub-client"
 documentation = "https://docs.rs/pub-sub-client/latest/pub_sub_client/"
 include = [
