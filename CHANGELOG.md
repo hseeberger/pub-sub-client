@@ -1,5 +1,6 @@
 # Changelog
 
+
 ## [0.13.6](https://github.com/hseeberger/pub-sub-client/compare/v0.13.5...v0.13.6) - 2026-11-02
 
 ### Bug Fixes
