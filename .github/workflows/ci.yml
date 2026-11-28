@@ -67,7 +67,7 @@ jobs:
           components: rustfmt
 
       - name: Install just
-        uses: taiki-e/install-action@4a76afe23f9e08d2d9550fb56e556444e8611d21 # v2.90.4
+        uses: taiki-e/install-action@25f51f6b1bf4e18876107cece836f4f77ac17c8c # v2.90.7
         with:
           tool: just
 
@@ -93,7 +93,7 @@ jobs:
           components: clippy
 
       - name: Install just
-        uses: taiki-e/install-action@4a76afe23f9e08d2d9550fb56e556444e8611d21 # v2.90.4
+        uses: taiki-e/install-action@25f51f6b1bf4e18876107cece836f4f77ac17c8c # v2.90.7
         with:
           tool: just
 
@@ -121,7 +121,7 @@ jobs:
           toolchain: ${{ needs.toolchain.outputs.stable }}
 
       - name: Install just
-        uses: taiki-e/install-action@4a76afe23f9e08d2d9550fb56e556444e8611d21 # v2.90.4
+        uses: taiki-e/install-action@25f51f6b1bf4e18876107cece836f4f77ac17c8c # v2.90.7
         with:
           tool: just
 
@@ -151,7 +151,7 @@ jobs:
           components: rust-docs
 
       - name: Install just
-        uses: taiki-e/install-action@4a76afe23f9e08d2d9550fb56e556444e8611d21 # v2.90.4
+        uses: taiki-e/install-action@25f51f6b1bf4e18876107cece836f4f77ac17c8c # v2.90.7
         with:
           tool: just
 
@@ -167,7 +167,7 @@ jobs:
     name: Breaking Bump
     if: github.event_name == 'pull_request'
     needs: toolchain
-    uses: hseeberger/breaking-bump/.github/workflows/breaking-bump.yml@bd956e7e0818881ced6ce7bbe327593eaa2e570f # v0.1.0
+    uses: hseeberger/breaking-bump/.github/workflows/breaking-bump.yml@c52a11f8fe87719c843b9c33af45459b85c45a17 # v0.1.4
     permissions:
       contents: read
     with:
